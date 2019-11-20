@@ -190,12 +190,12 @@ class Diag(object):
       if norm:
          if field_name is 'rho':
             E0 = -e*n_e
-         elif coord in ['x','y']:
-            omegap = self.params['omegap']
-            E0 = m_e *c*omegap/e
+         elif coord in ['x','y','r','t']:
+            omegap = self.params['omega0']
+            E0 = m_e *c*omega0/e
          else:
-            omega0 = self.params['omega0']
-            E0 = m_e*c*omega0/e
+            omega0 = self.params['omegap']
+            E0 = m_e*c*omegap/e
 
       plt.plot(info_e.z*1.e6,E[Nr,:]/E0,**kwargs)
 
@@ -207,12 +207,12 @@ class Diag(object):
       if norm:
          if field_name is 'rho':
             E0 = -e*n_e
-         elif coord in ['x','y']:
-            omegap = self.params['omegap']
-            E0 = m_e *c*omegap/e
-         else:
+         elif coord in ['x','y','r','t']:
             omega0 = self.params['omega0']
-            E0 = m_e*c*omega0/e
+            E0 = m_e *c*omega0/e
+         else:
+            omegap = self.params['omegap']
+            E0 = m_e*c*omegap/e
       
       plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs)      
 
