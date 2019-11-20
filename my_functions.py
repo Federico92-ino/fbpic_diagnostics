@@ -7,23 +7,23 @@ Set of functions by FA
 import numpy as np
 from opmd_viewer import OpenPMDTimeSeries
 import json
+from scipy.constants import e, m_e, c, pi, epsilon_0
 
+######################### Diag ###############################
 class Diag(object):
+
    def __init__(self, path):
       self.ts = OpenPMDTimeSeries(path)
-      self.params = json.load( open('params.json'))
-
-    
+      self.params = json.load( open('params.json')) 
 
 ###################### read_properties #########################
-   def read_properties (**kwargs):
+   def read_properties (self,**kwargs):
 
       """
        Function to convert a OpenPMDTimeSeries.get_particle() array list output in a dict
 
        **Parameters**
 
-       ts: an OpenPMDTimeSeries object
        **kwargs: the same parameters of .get_particle() method passed as keywords
 
       """
@@ -44,7 +44,7 @@ class Diag(object):
    #####################  emittance_l  #######################
    def emittance_l (ar_list,weights):
 
-     """
+        """
         Function to calculate bunches'normalized longitudinal emittance;
         the result is given in mm*mrad.
 
@@ -54,32 +54,31 @@ class Diag(object):
    
        **Returns**
         emittance, beam size and momenta spread   
-     """
+        """
    
 
    #Check ar_list
-     try:
-       type(ar_list) == list 
-     except ValueError:
-       print('The argument must be a list')
+      if type(ar_list) is not list: 
+   
+         print('The argument must be a list')
 
 
-     if len(ar_list)>2 or len(ar_list)<1:
-       print('ar_list must be long just two strings')
-       return
+      if len(ar_list)>2 or len(ar_list)<1:
+         print('ar_list must be long just two strings')
+         return
 
    #Longitudinal emittance
    
    
-     x, ux, w = ar_list[0], ar_list[1], weights
-     x_mean = np.ma.average(x, weights=w)
-     ux_mean = np.ma.average(ux, weights=w)  
-     sigma_x2 = np.ma.average((x-x_mean)**2, weights=w)
-     sigma_ux2 = np.ma.average((ux-ux_mean)**2, weights=w)
-     sigma_xux2 = (np.ma.average((x-x_mean)*(ux-ux_mean), weights=w))**2 
+      x, ux, w = ar_list[0], ar_list[1], weights
+      x_mean = np.ma.average(x, weights=w)
+      ux_mean = np.ma.average(ux, weights=w)  
+      sigma_x2 = np.ma.average((x-x_mean)**2, weights=w)
+      sigma_ux2 = np.ma.average((ux-ux_mean)**2, weights=w)
+      sigma_xux2 = (np.ma.average((x-x_mean)*(ux-ux_mean), weights=w))**2 
    
-     emit=np.sqrt(sigma_x2*sigma_ux2-sigma_xux2)
-     return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
+      emit=np.sqrt(sigma_x2*sigma_ux2-sigma_xux2)
+      return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
 
    #########################  emittance_t  #############################
    def emittance_t (ar_list,weights):
@@ -98,26 +97,24 @@ class Diag(object):
 
 
    #Check var_list
-    try:
-       type(ar_list) == list
-    except ValueError:
+      if type(ar_list) is not list:
        print('The argument must be a list')
 
 
-    if len(ar_list)>2 or len(ar_list)<1:
+      if len(ar_list)>2 or len(ar_list)<1:
        print('ar_list must be long just two strings')
        return
 
    #Transverse emittance
 
-    x, ux, w = ar_list[0], ar_list[1], weights
+      x, ux, w = ar_list[0], ar_list[1], weights
    
-    sigma_x2 = np.ma.average(x**2, weights=w)
-    sigma_ux2 = np.ma.average(ux**2,weights=w)
-    sigma_xux = np.ma.average(x*ux, weights=w)  
+      sigma_x2 = np.ma.average(x**2, weights=w)
+      sigma_ux2 = np.ma.average(ux**2,weights=w)
+      sigma_xux = np.ma.average(x*ux, weights=w)  
 
-    emit=np.sqrt(sigma_x2*sigma_ux2 - sigma_xux**2)
-    return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
+      emit=np.sqrt(sigma_x2*sigma_ux2 - sigma_xux**2)
+      return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
    
    #######################  bunche_charge  ############################
    def bunch_charge (charge, weights):
@@ -129,8 +126,8 @@ class Diag(object):
        weights: ndarray of particles' weights in the bunch
 
     """
-    b_charge = charge*weights.sum()
-    return b_charge
+      b_charge = charge*weights.sum()
+      return b_charge
 
    #####################  slice_emit  ###########################
    def slice_emit (dict, N):
@@ -155,6 +152,7 @@ class Diag(object):
       Z=[]
       X=[]
       UX=[]
+      ZZ=[]
 
       a=dict['z'].argsort()
       x=dict['x'][a]
@@ -180,21 +178,45 @@ class Diag(object):
          inds = np.where((dict['z'] >= dict['z'].mean()+np.sqrt((n*dict['z'].var()))-dz/2) & (dict['z'] <= dict['z'].mean()+np.sqrt((n*dict['z'].var()))+dz/2))
          X.append(x[inds])
          UX.append(ux[inds])
+         ZZ.append(dict['z'][inds])
 
-      Ph_space = {'x': X, 'ux': UX}
+      Ph_space = {'x': X, 'ux': UX, 'z': ZZ}
 
       return S_prop, Ph_space, dz
-
+   ############### lineout #####################
    def lineout(self, field_name, coord, iteration, theta, m, norm = False,**kwargs):
       E, info_e = self.ts.get_field(field=field_name, coord=coord, iteration=iteration, theta=theta, m=m)
       E0 = 1
-      Nr = self.param['Nr']
+      Nr = self.params['Nr']
+      n_e = self.params['n_e']
       if norm:
-         omegap=self.params['omegap']
-         E0 = m_e *c*omeagp/e
+         if field_name is 'rho':
+            E0 = -e*n_e
+         elif coord is in ['x','y']:
+            omegap = self.params['omegap']
+            E0 = m_e *c*omeagp/e
+         else:
+            omega0 = self.parmas['omega0']
+            E0 = m_e*c*omega0/e
+
       plt.plot(info_e.z*1.e6,E[Nr,:]/E0,**kwargs)
 
-   def imshow(self, field, extent=info_)       
+   ################# imshow ####################
+   def imshow(self, field_name, coord, iteration, theta, m, norm = False, **kwargs):
+      E, info_e = self.ts.get_field(field=field_name, coord=coord, iteration=iteration, theta=theta, m=m)
+      E0 = 1
+      n_e = self.params['n_e']
+      if norm:
+         if field_name is 'rho':
+            E0 = -e*n_e
+         elif coord is in ['x','y']:
+            omegap = self.params['omegap']
+            E0 = m_e *c*omeagp/e
+         else:
+            omega0 = self.parmas['omega0']
+            E0 = m_e*c*omega0/e
+      
+      plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs)      
 
 
 
