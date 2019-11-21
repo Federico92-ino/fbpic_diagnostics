@@ -180,12 +180,12 @@ class Diag(object):
       emit, sigma_x2, sigma_ux2, charge = [],[],[],[]
 
       for i in self.iterations:
-         x, ux, w = self.ts.get_particle(['x','ux','w'], iteration=self.iterations[i], select=pt)
+         x, ux, w = self.ts.get_particle(['x','ux','w'], iteration=i, select=pt)
          a, b, c = self.emittance_t(x, ux, w)
          emit.append(a)
          sigma_x2.append(b)
          sigma_ux2.append(c)
-         charge.append(e*w.sum())
+         charge.append(e*w.sum()*ptcl_percent)
 
       fig, ax = plt.subplots(2, 2, figsize=(10,10))
       
