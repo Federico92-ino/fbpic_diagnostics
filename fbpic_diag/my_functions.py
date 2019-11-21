@@ -31,7 +31,7 @@ class Diag(object):
       dictionary = dict()
          
       for key in var_list:
-         dictionary.update(key=self.ts.get_particle([key], **kwargs)[0])
+         dictionary[key]=self.ts.get_particle([key], **kwargs)[0]
       return dictionary
 
 #####################  emittance_l  #######################
@@ -180,7 +180,7 @@ class Diag(object):
       emit, sigma_x2, sigma_ux2, charge = [],[],[],[]
 
       for i in self.iterations:
-         x, ux, w = self.ts.get_particle(['x','ux','w'], iteration=self.iterations, select=pt)
+         x, ux, w = self.ts.get_particle(['x','ux','w'], iteration=self.iterations[i], select=pt)
          a, b, c = self.emittance_t(x, ux, w)
          emit.append(a)
          sigma_x2.append(b)
