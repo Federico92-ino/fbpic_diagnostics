@@ -120,7 +120,7 @@ class Diag(object):
 
          Z.append(dict['z'][inds].mean())
 
-         s_prop = self.emittance_t( [x[inds], ux[inds]], w[inds])
+         s_prop = self.emittance_t(x[inds], ux[inds], w[inds])
          s_emit.append(s_prop[0])
          s_sigma_x2.append(s_prop[1])
          s_sigma_ux2.append(s_prop[2])
@@ -139,7 +139,7 @@ class Diag(object):
       return S_prop, Ph_space, dz
 
 ############### lineout #####################
-   def lineout(self, field_name, coord=None, iteration, theta=0, m='all', norm = False,**kwargs):
+   def lineout(self, field_name, iteration, coord=None, theta=0, m='all', norm=False, **kwargs):
       E, info_e = self.ts.get_field(field=field_name, coord=coord, iteration=iteration, theta=theta, m=m)
       E0 = 1
       Nr = self.params['Nr']
@@ -157,7 +157,7 @@ class Diag(object):
       plt.plot(info_e.z*1.e6,E[Nr,:]/E0,**kwargs)
 
 ################# map ####################
-   def map(self, field_name, coord=None, iteration, theta=0, m='all', norm = False, **kwargs):
+   def map(self, field_name, iteration, coord=None, theta=0, m='all', norm = False, **kwargs):
       E, info_e = self.ts.get_field(field=field_name, coord=coord, iteration=iteration, theta=theta, m=m)
       E0 = 1
       n_e = self.params['n_e']
@@ -174,7 +174,7 @@ class Diag(object):
       plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs)      
 
 ################# bunch_properties_evolution ################
-   def bunch_properties_evolution(self, select, ptcl_percent=1 **kwargs):
+   def bunch_properties_evolution(self, select, ptcl_percent=1, **kwargs):
       
       pt = ParticleTracker(self.ts, iteration=self.ts.iterations.max(),select=select)
       emit, sigma_x2, sigma_ux2, charge = [],[],[],[]
@@ -189,10 +189,10 @@ class Diag(object):
 
       fig, ax = plt.subplots(2, 2, figsize=(10,10))
       
-      ax[0,0].plot(self.ts.t*c*1.e6, emit), ax[0,0].set_title('emit')
-      ax[0,1].plot(self.ts.t*c*1.e6, sigma_x2), ax[0,1].set_title('beam size')
-      ax[1,0].plot(self.ts.t*c*1.e6, sigma_ux2), ax[1,0].set_title('momenta spread')
-      ax[1,1].plot(self.ts.t*c*1.e6, charge), ax[1,1].set_title('charge')
+      ax[0,0].plot(self.ts.t*c*1.e6, emit, **kwargs), ax[0,0].set_title('emit')
+      ax[0,1].plot(self.ts.t*c*1.e6, sigma_x2, **kwargs), ax[0,1].set_title('beam size')
+      ax[1,0].plot(self.ts.t*c*1.e6, sigma_ux2, **kwargs), ax[1,0].set_title('momenta spread')
+      ax[1,1].plot(self.ts.t*c*1.e6, charge, **kwargs), ax[1,1].set_title('charge')
       
       prop={'emit':emit,'sigma_x2':sigma_x2,'sigma_ux2':sigma_ux2,'charge':charge}
       
