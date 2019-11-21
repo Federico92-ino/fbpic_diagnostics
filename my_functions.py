@@ -18,24 +18,20 @@ class Diag(object):
       self.params = json.load( open('params.json')) 
 
 ###################### read_properties #########################
-   def read_properties (self,**kwargs):
+   def read_properties (self, var_list, **kwargs):
 
       """
       Function to convert a OpenPMDTimeSeries.get_particle() array list output in a dict
 
       **Parameters**
+         var_list:  list of strings of quantities to get
          **kwargs: the same parameters of .get_particle() method passed as keywords
       """
-   
-      list=self.ts.get_particle(**kwargs)
-      dict={kwargs['var_list'][0]:0}
-   
-      for i,key in enumerate(kwargs['var_list']):
-         if len(list[i])==1:
-            dict[key]=float(list[i])
-         else:
-            dict[key]=list[i]
-      return dict
+      dictionary = dict()
+         
+      for key in var_list:
+         dictionary[key] = self.ts.get_particle([key], **kwargs)
+      return dictionary
 
 #####################  emittance_l  #######################
    def emittance_l (self, ar_list,weights):
