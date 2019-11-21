@@ -6,7 +6,7 @@ Set of functions by FA
 #Import section
 import numpy as np
 import matplotlib.pyplot as plt
-from OpenPMD_viewer import OpenPMDTimeSeries, ParticleTracker
+from opmd_viewer import OpenPMDTimeSeries, ParticleTracker
 import json
 from scipy.constants import e, m_e, c, pi, epsilon_0
 
