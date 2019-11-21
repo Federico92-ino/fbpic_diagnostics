@@ -6,7 +6,7 @@ Set of functions by FA
 #Import section
 import numpy as np
 import matplotlib.pyplot as plt
-from opmd_viewer import OpenPMDTimeSeries
+from OpenPMD_viewer import OpenPMDTimeSeries, ParticleTracker
 import json
 from scipy.constants import e, m_e, c, pi, epsilon_0
 
@@ -15,7 +15,8 @@ class Diag(object):
 
    def __init__(self, path):
       self.ts = OpenPMDTimeSeries(path)
-      self.params = json.load( open('params.json')) 
+      self.params = json.load( open('params.json'))
+      self.iterations = self.ts.iterations 
 
 ###################### read_properties #########################
    def read_properties (self, var_list, **kwargs):
@@ -30,40 +31,26 @@ class Diag(object):
       dictionary = dict()
          
       for key in var_list:
-         dictionary[key] = self.ts.get_particle([key], **kwargs)
+         dictionary.update(key=self.ts.get_particle([key], **kwargs)[0])
       return dictionary
 
 #####################  emittance_l  #######################
-   def emittance_l (self, ar_list,weights):
+   def emittance_l (self, x, ux, w):
 
       """
        Function to calculate bunches'normalized longitudinal emittance; the result is given in mm*mrad.
 
        **Parameters**
-         ar_list: list of two ndarrays of  phase-space coords
-         weights: ndarray of particles' weights   
+         x, ux: two 1darrays of  phase-space coords
+         w: ndarray of particles' weights   
    
        **Returns**
          emittance, beam size and momenta spread   
-      """
-   
-
-      #Check ar_list
-      if type(ar_list) is not list:
-         print('The argument must be a list')
-
-
-      if len(ar_list)>2 or len(ar_list)<1:
-         print('ar_list must be long just two strings')
-      
-         return
-      
+      """   
  
 
       #Longitudinal emittance
-   
-   
-      x, ux, w = ar_list[0], ar_list[1], weights
+
       x_mean = np.ma.average(x, weights=w)
       ux_mean = np.ma.average(ux, weights=w)  
       sigma_x2 = np.ma.average((x-x_mean)**2, weights=w)
@@ -74,34 +61,20 @@ class Diag(object):
       return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
 
 #########################  emittance_t  #############################
-   def emittance_t (self, ar_list,weights):
+   def emittance_t (self, x, ux, w):
 
       """
         Function to calculate bunches'normalized transverse emittance;
         the result is given in mm*mrad.
 
        **Parameters**
-        ar_list: list of two ndarrays of  phase-space coords
-        weights: ndarray of particles' weights
+        x, ux: two ndarrays of  phase-space coords
+        w: ndarray of particles' weights
 
        **Returns**
         emittance, beam size, momenta spread
       """
-
-
-      #Check var_list
-      if type(ar_list) is not list:
-         print('The argument must be a list')
-
-
-      if len(ar_list)>2 or len(ar_list)<1:
-         print('ar_list must be long just two strings')
-      
-         return
-
       #Transverse emittance
-
-      x, ux, w = ar_list[0], ar_list[1], weights
    
       sigma_x2 = np.ma.average(x**2, weights=w)
       sigma_ux2 = np.ma.average(ux**2,weights=w)
@@ -109,20 +82,7 @@ class Diag(object):
 
       emit=np.sqrt(sigma_x2*sigma_ux2 - sigma_xux**2)
       return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
-   
-#######################  bunche_charge  ############################
-   def bunch_charge (self, charge, weights):
-      """
-       Function to calculate bunch charge
-
-       **Parameters**
-         charge: int; single particle charge 
-         weights: ndarray of particles' weights in the bunch
-
-      """
-      b_charge = charge*weights.sum()
-      return b_charge
-
+  
 #####################  slice_emit  ###########################
    def slice_emit (self, dict, N):
       """
@@ -177,8 +137,9 @@ class Diag(object):
       Ph_space = {'x': X, 'ux': UX, 'z': ZZ}
 
       return S_prop, Ph_space, dz
+
 ############### lineout #####################
-   def lineout(self, field_name, coord, iteration, theta, m, norm = False,**kwargs):
+   def lineout(self, field_name, coord=None, iteration, theta=0, m='all', norm = False,**kwargs):
       E, info_e = self.ts.get_field(field=field_name, coord=coord, iteration=iteration, theta=theta, m=m)
       E0 = 1
       Nr = self.params['Nr']
@@ -195,8 +156,8 @@ class Diag(object):
 
       plt.plot(info_e.z*1.e6,E[Nr,:]/E0,**kwargs)
 
-################# imshow ####################
-   def imshow(self, field_name, coord, iteration, theta, m, norm = False, **kwargs):
+################# map ####################
+   def map(self, field_name, coord=None, iteration, theta=0, m='all', norm = False, **kwargs):
       E, info_e = self.ts.get_field(field=field_name, coord=coord, iteration=iteration, theta=theta, m=m)
       E0 = 1
       n_e = self.params['n_e']
@@ -212,8 +173,30 @@ class Diag(object):
       
       plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs)      
 
+################# bunch_properties_evolution ################
+   def bunch_properties_evolution(self, select, ptcl_percent=1 **kwargs):
+      
+      pt = ParticleTracker(self.ts, iteration=self.ts.iterations.max(),select=select)
+      emit, sigma_x2, sigma_ux2, charge = [],[],[],[]
 
+      for i in self.iterations:
+         x, ux, w = self.ts.get_particle(['x','ux','w'], iteration=self.iterations, select=pt)
+         a, b, c = self.emittance_t(x, ux, w)
+         emit.append(a)
+         sigma_x2.append(b)
+         sigma_ux2.append(c)
+         charge.append(e*w.sum())
 
+      fig, ax = plt.subplots(2, 2, figsize=(10,10))
+      
+      ax[0,0].plot(self.ts.t*c*1.e6, emit), ax[0,0].set_title('emit')
+      ax[0,1].plot(self.ts.t*c*1.e6, sigma_x2), ax[0,1].set_title('beam size')
+      ax[1,0].plot(self.ts.t*c*1.e6, sigma_ux2), ax[1,0].set_title('momenta spread')
+      ax[1,1].plot(self.ts.t*c*1.e6, charge), ax[1,1].set_title('charge')
+      
+      prop={'emit':emit,'sigma_x2':sigma_x2,'sigma_ux2':sigma_ux2,'charge':charge}
+      
+      return prop, fig, ax
    
 
                      
