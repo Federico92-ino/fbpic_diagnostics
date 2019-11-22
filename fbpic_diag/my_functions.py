@@ -17,7 +17,7 @@ class Diag(object):
       self.ts = OpenPMDTimeSeries(path)
       self.params = json.load( open('params.json'))
       self.iterations = self.ts.iterations 
-
+      self.t=self.ts.t
 ###################### read_properties #########################
    def read_properties (self, var_list, **kwargs):
 
@@ -174,26 +174,28 @@ class Diag(object):
       plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs)      
 
 ################# bunch_properties_evolution ################
-   def bunch_properties_evolution(self, select, ptcl_percent=1, **kwargs):
+   def bunch_properties_evolution(self, select, iteration, ptcl_percent=1, **kwargs):
       
-      pt = ParticleTracker(self.ts, iteration=self.ts.iterations.max(),select=select)
+      pt = ParticleTracker(self.ts, iteration=iteration,select=select)
       emit, sigma_x2, sigma_ux2, charge = [],[],[],[]
+      z = c*self.t*1.e6  #in microns
 
       for i in self.iterations:
          x, ux, w = self.ts.get_particle(['x','ux','w'], iteration=i, select=pt)
-         a, b, c = self.emittance_t(x, ux, w)
-         emit.append(a)
-         sigma_x2.append(b)
-         sigma_ux2.append(c)
-         charge.append(e*w.sum()*ptcl_percent)
+         l, m, n = self.emittance_t(x, ux, w)
+         emit.append(l)
+         sigma_x2.append(m)
+         sigma_ux2.append(n)
+         charge.append(w.sum()*e/ptcl_percent)
 
       fig, ax = plt.subplots(2, 2, figsize=(10,10))
       
-      ax[0,0].plot(self.ts.t*c*1.e6, emit, **kwargs), ax[0,0].set_title('emit')
-      ax[0,1].plot(self.ts.t*c*1.e6, sigma_x2, **kwargs), ax[0,1].set_title('beam size')
-      ax[1,0].plot(self.ts.t*c*1.e6, sigma_ux2, **kwargs), ax[1,0].set_title('momenta spread')
-      ax[1,1].plot(self.ts.t*c*1.e6, charge, **kwargs), ax[1,1].set_title('charge')
-      
+      ax[0,0].plot(z, emit, **kwargs), ax[0,0].set_title('emit')
+      ax[0,1].plot(z, sigma_x2, **kwargs), ax[0,1].set_title('beam size')
+      ax[1,0].plot(z, sigma_ux2, **kwargs), ax[1,0].set_title('momenta spread')
+      ax[1,1].plot(z, charge, **kwargs), ax[1,1].set_title('charge')
+      plt.tight_layout()
+
       prop={'emit':emit,'sigma_x2':sigma_x2,'sigma_ux2':sigma_ux2,'charge':charge}
       
       return prop, fig, ax
