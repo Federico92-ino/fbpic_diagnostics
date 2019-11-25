@@ -269,7 +269,25 @@ class Diag(object):
         return prop, fig, ax
 
     def phase_space_hist(self, species, iteration, component1='z', component2='uz', select=None, **kwargs):
+        """
+        Method that plots a 2D histogram of the particles phase space.
 
+        Parameters:
+        ----------
+        species: str
+            Select the particle specie among the available ones
+            (Check them out in avail_species)
+        iteration: int
+            Selected iteration
+        component1: str
+            First phase space component of the phase space plot
+            (Check the available components in avail_record_components)
+        component2: str
+            Second phase space component of the phase space plot
+            (Check the available components in avail_record_components)
+        select: dict
+            Particle selector
+        """
         cmap = 'Reds'
         bins = 1000
         density = True
