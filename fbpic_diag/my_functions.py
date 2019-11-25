@@ -19,7 +19,7 @@ class Diag(object):
    def __init__(self, path):
       self.ts = OpenPMDTimeSeries(path)
       self.params = json.load( open('params.json'))
-      self.iterations = self.ts.iterations 
+      self.iterations = self.ts.iterations
       self.t=self.ts.t
 ###################### read_properties #########################
    def read_properties (self, var_list, **kwargs):
@@ -103,18 +103,18 @@ class Diag(object):
       """
       dz = (dict['z'].max()-dict['z'].min())/N
 
-      s_emit=[]
-      s_sigma_x2=[]
-      s_sigma_ux2=[]
-      Z=[]
-      X=[]
-      UX=[]
-      ZZ=[]
+      s_emit = list()
+      s_sigma_x2 = list()
+      s_sigma_ux2 = list()
+      Z = list()
+      X = list()
+      UX = list()
+      ZZ = list()
 
-      a=dict['z'].argsort()
-      x=dict['x'][a]
-      ux=dict['ux'][a]
-      w=dict['w'][a]
+      a = dict['z'].argsort()
+      x = dict['x'][a]
+      ux = dict['ux'][a]
+      w = dict['w'][a]
       dict['z'].sort()
 
 
@@ -163,9 +163,9 @@ class Diag(object):
       Nr = self.params['Nr']
       n_e = self.params['n_e']
       if norm:
-         if field_name is 'rho':
+         if field_name == 'rho':
             E0 = -e*n_e
-         elif coord in ['x','y','r','t']:
+         elif coord in ['x', 'y', 'r', 't']:
             omega0 = self.params['omega0']
             E0 = m_e *c*omega0/e
          else:
@@ -194,16 +194,17 @@ class Diag(object):
       E0 = 1
       n_e = self.params['n_e']
       if norm:
-         if field_name is 'rho':
+         if field_name == 'rho':
             E0 = -e*n_e
-         elif coord in ['x','y','r','t']:
+         elif coord in ['x', 'y', 'r', 't']:
             omega0 = self.params['omega0']
             E0 = m_e *c*omega0/e
          else:
             omegap = self.params['omegap']
             E0 = m_e*c*omegap/e
       
-      plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs), plt.colorbar()      
+      plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs)
+      plt.colorbar()      
 
 ################# bunch_properties_evolution ################
    def bunch_properties_evolution(self, select, species='electrons', ptcl_percent=1, **kwargs):
@@ -235,7 +236,7 @@ class Diag(object):
              
       """
      
-      emit, sigma_x2, sigma_ux2, charge = [],[],[],[]
+      emit, sigma_x2, sigma_ux2, charge = list(), list(), list(), list()
       z = c*self.t*1.e6  #in microns
 
       for i in self.iterations:
@@ -259,7 +260,7 @@ class Diag(object):
       sigma_ux2 = np.array(sigma_ux2)
       charge = np.array(charge)
       
-      prop={'emit':emit,'sigma_x2':sigma_x2,'sigma_ux2':sigma_ux2,'charge':charge}
+      prop={'emit':emit, 'sigma_x2':sigma_x2, 'sigma_ux2':sigma_ux2, 'charge':charge}
       
       return prop, fig, ax
    
