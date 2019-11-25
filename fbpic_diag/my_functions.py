@@ -261,25 +261,25 @@ class Diag(object):
       
       return prop, fig, ax
 ######################## spectrum ###################
-def spectrum(self,iteration, select=None, species='electrons', **kwargs):
-   """
-   Method to easily get an energy spectrum of 'selected' particles
-   **Parameters**
-    iteration: int, which iteration we need
-    select: particle select, dictionary o ParticleTracker istance
-    species: string, optional: default is 'electrons'
-    **kwargs: keyword to pass to .hist() method
-   **Returns**
-    ax: axes.Axes object to handle
-   """
-   ptcl_percent = self.params['ptcl_percent']
-
-   gamma, w = self.ts.get_particle(['gamma','w'], iteration=iteration, species=species, select=select)
+   def spectrum(self,iteration, select=None, species='electrons', **kwargs):
+      """
+      Method to easily get an energy spectrum of 'selected' particles
+      **Parameters**
+       iteration: int, which iteration we need
+       select: particle select, dictionary o ParticleTracker istance
+       species: string, optional: default is 'electrons'
+       **kwargs: keyword to pass to .hist() method
+      **Returns**
+       ax: axes.Axes object to handle
+      """
+      ptcl_percent = self.params['ptcl_percent']
    
-   ax=plt.subplot(111)
-   values, bins, patches = ax.hist(0.511*gamma, weights=ptcl_percent*w, **kwargs) #needed values output as self.values? I'll see
-   del values, bins, patches
-   
-   return ax   
+      gamma, w = self.ts.get_particle(['gamma','w'], iteration=iteration, species=species, select=select)
+      
+      ax=plt.subplot(111)
+      values, bins, patches = ax.hist(0.511*gamma, weights=ptcl_percent*w, **kwargs) #needed values output as self.values? I'll see
+      del values, bins, patches
+      
+      return ax   
 
                      
