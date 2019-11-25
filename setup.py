@@ -1,10 +1,14 @@
 from setuptools import setup, find_packages
 import numpy
 
-__version__ = "0.0.1"
+about = dict()
+with open("fbpic_diag/__about__.py") as fp:
+    exec(fp.read(), about)
+
+__version__ = about['__version__']
 
 # with open('README.md') as f:
-    # long_description = f.read()
+# long_description = f.read()
 
 requirements = ['numpy', 'matplotlib', 'openPMD-viewer', 'scipy']
 setup(

@@ -1,4 +1,3 @@
-
 """
 Set of functions by FA
 
@@ -10,203 +9,209 @@ from opmd_viewer import OpenPMDTimeSeries, ParticleTracker
 import json
 from scipy.constants import e, m_e, c, pi, epsilon_0
 
+
 ######################### Diag ###############################
 class Diag(object):
-   """
-   A class to handle diagnostics of a plasma simulation; pass the path of hd5f files 
-   
-   """
-   def __init__(self, path):
-      self.ts = OpenPMDTimeSeries(path)
-      self.params = json.load( open('params.json'))
-      self.iterations = self.ts.iterations 
-      self.t=self.ts.t
+    """
+    A class to handle diagnostics of a plasma simulation; pass the path of hd5f files
+    """
+    def __init__(self, path):
+        self.ts = OpenPMDTimeSeries(path)
+        self.params = json.load( open('params.json'))
+        self.iterations = self.ts.iterations
+        self.t = self.ts.t
+        self.avail_fields = self.ts.avail_fields
+        self.avail_geom = self.ts.avail_geom
+        self.avail_species = self.ts.avail_species
+        self.avail_record_components = self.ts.avail_record_components
+
 ###################### read_properties #########################
-   def read_properties (self, var_list, **kwargs):
+    def read_properties (self, var_list, **kwargs):
 
-      """
-      Function to convert a OpenPMDTimeSeries.get_particle() array list output in a dict
+        """
+        Function to convert a OpenPMDTimeSeries.get_particle() array list output in a dict
 
-      **Parameters**
-         var_list:  list of strings of quantities to get
-         **kwargs: the same parameters of .get_particle() method passed as keywords
-      """
-      dictionary = dict()
-         
-      for key in var_list:
-         dictionary[key]=self.ts.get_particle([key], **kwargs)[0]
-      return dictionary
+        **Parameters**
+            var_list:  list of strings of quantities to get
+            **kwargs: the same parameters of .get_particle() method passed as keywords
+        """
+        dictionary = dict()
+
+        for key in var_list:
+            dictionary[key]=self.ts.get_particle([key], **kwargs)[0]
+        return dictionary
 
 #####################  emittance_l  #######################
-   def emittance_l (self, x, ux, w):
+    def emittance_l (self, x, ux, w):
 
-      """
-       Function to calculate bunches'normalized longitudinal emittance; the result is given in mm*mrad.
+        """
+         Function to calculate bunches'normalized longitudinal emittance; the result is given in mm*mrad.
 
-       **Parameters**
-         x, ux: two 1darrays of  phase-space coords
-         w: ndarray of particles' weights   
-   
-       **Returns**
-         emittance, beam size and momenta spread   
-      """   
- 
+         **Parameters**
+            x, ux: two 1darrays of  phase-space coords
+            w: ndarray of particles' weights
 
-      #Longitudinal emittance
+         **Returns**
+            emittance, beam size and momenta spread
+        """
 
-      x_mean = np.ma.average(x, weights=w)
-      ux_mean = np.ma.average(ux, weights=w)  
-      sigma_x2 = np.ma.average((x-x_mean)**2, weights=w)
-      sigma_ux2 = np.ma.average((ux-ux_mean)**2, weights=w)
-      sigma_xux2 = (np.ma.average((x-x_mean)*(ux-ux_mean), weights=w))**2 
-   
-      emit=np.sqrt(sigma_x2*sigma_ux2-sigma_xux2)
-      return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
+
+        #Longitudinal emittance
+
+        x_mean = np.ma.average(x, weights=w)
+        ux_mean = np.ma.average(ux, weights=w)
+        sigma_x2 = np.ma.average((x-x_mean)**2, weights=w)
+        sigma_ux2 = np.ma.average((ux-ux_mean)**2, weights=w)
+        sigma_xux2 = (np.ma.average((x-x_mean)*(ux-ux_mean), weights=w))**2
+
+        emit = np.sqrt(sigma_x2*sigma_ux2-sigma_xux2)
+        return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
 
 #########################  emittance_t  #############################
-   def emittance_t (self, x, ux, w):
+    def emittance_t (self, x, ux, w):
 
-      """
-        Function to calculate bunches'normalized transverse emittance;
-        the result is given in mm*mrad.
+        """
+          Function to calculate bunches'normalized transverse emittance;
+          the result is given in mm*mrad.
 
-       **Parameters**
-        x, ux: two ndarrays of  phase-space coords
-        w: ndarray of particles' weights
+         **Parameters**
+          x, ux: two ndarrays of  phase-space coords
+          w: ndarray of particles' weights
 
-       **Returns**
-        emittance, beam size, momenta spread
-      """
-      #Transverse emittance
-   
-      sigma_x2 = np.ma.average(x**2, weights=w)
-      sigma_ux2 = np.ma.average(ux**2,weights=w)
-      sigma_xux = np.ma.average(x*ux, weights=w)  
+         **Returns**
+          emittance, beam size, momenta spread
+        """
+        #Transverse emittance
 
-      emit=np.sqrt(sigma_x2*sigma_ux2 - sigma_xux**2)
-      return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
-  
+        sigma_x2 = np.ma.average(x**2, weights=w)
+        sigma_ux2 = np.ma.average(ux**2,weights=w)
+        sigma_xux = np.ma.average(x*ux, weights=w)
+
+        emit=np.sqrt(sigma_x2*sigma_ux2 - sigma_xux**2)
+        return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
+
 #####################  slice_emit  ###########################
-   def slice_emit (self, dict, N):
-      """
-      Function to calculate slice emittances of a 'N sliced' bunch
-      **Parameters**
-         dict: a "read_properties" dictionary
-         N: int, number of slices 
-      **Returns**
-         S_prop: a dictionary of properties of each slice: emittance, size, momenta spread and phase_space of each slice
-         Ph_space: an arrays' dictionary of 'x'-'ux'-'z' values of three slices taken at z_mean, (z_mean-z_dev) and (z_mean+z_dev)
-         dz: longitudinal slices' thickness 
+    def slice_emit (self, dict, N):
+        """
+        Function to calculate slice emittances of a 'N sliced' bunch
+        **Parameters**
+            dict: a "read_properties" dictionary
+            N: int, number of slices
+        **Returns**
+            S_prop: a dictionary of properties of each slice: emittance, size, momenta spread and phase_space of each slice
+            Ph_space: an arrays' dictionary of 'x'-'ux'-'z' values of three slices taken at z_mean, (z_mean-z_dev) and (z_mean+z_dev)
+            dz: longitudinal slices' thickness
 
-      Note: here indexing of dict_keys labels over slices   
+        Note: here indexing of dict_keys labels over slices
 
-      """
-      dz = (dict['z'].max()-dict['z'].min())/N
+        """
+        dz = (dict['z'].max()-dict['z'].min())/N
 
-      s_emit=[]
-      s_sigma_x2=[]
-      s_sigma_ux2=[]
-      Z=[]
-      X=[]
-      UX=[]
-      ZZ=[]
+        s_emit = list()
+        s_sigma_x2 = list()
+        s_sigma_ux2 = list()
+        Z = list()
+        X = list()
+        UX = list()
+        ZZ = list()
 
-      a=dict['z'].argsort()
-      x=dict['x'][a]
-      ux=dict['ux'][a]
-      w=dict['w'][a]
-      dict['z'].sort()
-
-
-      for n in range(N):
-         inds = np.where( (dict['z'] >= dict['z'].min()+n*dz) & (dict['z'] <= dict['z'].min()+(n+1)*dz) )[0] 
-
-         Z.append(dict['z'][inds].mean())
-
-         s_prop = self.emittance_t(x[inds], ux[inds], w[inds])
-         s_emit.append(s_prop[0])
-         s_sigma_x2.append(s_prop[1])
-         s_sigma_ux2.append(s_prop[2])
+        a = dict['z'].argsort()
+        x = dict['x'][a]
+        ux = dict['ux'][a]
+        w = dict['w'][a]
+        dict['z'].sort()
 
 
-      S_prop={'s_emit':s_emit,'s_sigma_x2':s_sigma_x2,'s_sigma_ux2':s_sigma_ux2,'z': Z}
+        for n in range(N):
+            inds = np.where( (dict['z'] >= dict['z'].min()+n*dz) & (dict['z'] <= dict['z'].min()+(n+1)*dz) )[0]
 
-      for n in range(-1,1):
-         inds = np.where((dict['z'] >= dict['z'].mean()+np.sqrt((n*dict['z'].var()))-dz/2) & (dict['z'] <= dict['z'].mean()+np.sqrt((n*dict['z'].var()))+dz/2))
-         X.append(x[inds])
-         UX.append(ux[inds])
-         ZZ.append(dict['z'][inds])
+            Z.append(dict['z'][inds].mean())
 
-      Ph_space = {'x': X, 'ux': UX, 'z': ZZ}
+            s_prop = self.emittance_t(x[inds], ux[inds], w[inds])
+            s_emit.append(s_prop[0])
+            s_sigma_x2.append(s_prop[1])
+            s_sigma_ux2.append(s_prop[2])
 
-      return S_prop, Ph_space, dz
+
+        S_prop={'s_emit':s_emit,'s_sigma_x2':s_sigma_x2,'s_sigma_ux2':s_sigma_ux2,'z': Z}
+
+        for n in range(-1,1):
+            inds = np.where((dict['z'] >= dict['z'].mean()+np.sqrt((n*dict['z'].var()))-dz/2) & (dict['z'] <= dict['z'].mean()+np.sqrt((n*dict['z'].var()))+dz/2))
+            X.append(x[inds])
+            UX.append(ux[inds])
+            ZZ.append(dict['z'][inds])
+
+        Ph_space = {'x': X, 'ux': UX, 'z': ZZ}
+
+        return S_prop, Ph_space, dz
 
 ############### lineout #####################
-   def lineout(self, field_name, iteration, coord=None, theta=0, m='all', norm=False, **kwargs):
-      """
-      Method to get a lineout plot of passed field_name
-      **Parameters**
-       field_name: string, field to plot
-       iteration: int, the same as usual
-       coord, theta, m: same parameters of .get_field() method; same defaults (None, 0, 'all')
-       norm: bool, optional;
-             If norm = True this set the usual normalization of specified field, i.e:
-               - e*n_e for charge density 'rho'
-               - m_e*c*omega_0/e for transverse 'E'
-               - m_e*c*omega_p/e for longitudinal 'E'
-       **kwargs: keywords to pass to .pyplot.plot() function
-      
-      """
+    def lineout(self, field_name, iteration, coord=None, theta=0, m='all', norm=False, **kwargs):
+        """
+        Method to get a lineout plot of passed field_name
+        **Parameters**
+         field_name: string, field to plot
+         iteration: int, the same as usual
+         coord, theta, m: same parameters of .get_field() method; same defaults (None, 0, 'all')
+         norm: bool, optional;
+                 If norm = True this set the usual normalization of specified field, i.e:
+                    - e*n_e for charge density 'rho'
+                    - m_e*c*omega_0/e for transverse 'E'
+                    - m_e*c*omega_p/e for longitudinal 'E'
+         **kwargs: keywords to pass to .pyplot.plot() function
 
-      E, info_e = self.ts.get_field(field=field_name, coord=coord, iteration=iteration, theta=theta, m=m)
-      E0 = 1
-      Nr = self.params['Nr']
-      n_e = self.params['n_e']
-      if norm:
-         if field_name is 'rho':
-            E0 = -e*n_e
-         elif coord in ['x','y','r','t']:
-            omega0 = self.params['omega0']
-            E0 = m_e *c*omega0/e
-         else:
-            omegap = self.params['omegap']
-            E0 = m_e*c*omegap/e
+        """
 
-      plt.plot(info_e.z*1.e6, E[Nr,:]/E0, **kwargs)
+        E, info_e = self.ts.get_field(field=field_name, coord=coord, iteration=iteration, theta=theta, m=m)
+        E0 = 1
+        Nr = self.params['Nr']
+        n_e = self.params['n_e']
+        if norm:
+            if field_name == 'rho':
+                E0 = -e*n_e
+            elif coord in ['x', 'y', 'r', 't']:
+                omega0 = self.params['omega0']
+                E0 = m_e *c*omega0/e
+            else:
+                omegap = self.params['omegap']
+                E0 = m_e*c*omegap/e
+
+        plt.plot(info_e.z*1.e6, E[Nr,:]/E0, **kwargs)
 
 ################# map ####################
-   def map(self, field_name, iteration, coord=None, theta=0, m='all', norm = False, **kwargs):
-      """
-      Method to get a 2D-map of passed field_name
-      **Parameters**
-       field_name: string, field to plot
-       iteration: int, the same as usual
-       coord, theta, m: same parameters of .get_field() method; same defaults (None, 0, 'all')
-       norm: bool, optional;
-             If norm = True this set the usual normalization of specified field, i.e:
-               - e*n_e for charge density 'rho'; this return normalized density
-               - m_e*c*omega_0/e for transverse 'E'
-               - m_e*c*omega_p/e for longitudinal 'E'
-       **kwargs: keywords to pass to .pyplot.imshow() function
-      
-      """
-      E, info_e = self.ts.get_field(field=field_name, coord=coord, iteration=iteration, theta=theta, m=m)
-      E0 = 1
-      n_e = self.params['n_e']
-      if norm:
-         if field_name is 'rho':
-            E0 = -e*n_e
-         elif coord in ['x','y','r','t']:
-            omega0 = self.params['omega0']
-            E0 = m_e *c*omega0/e
-         else:
-            omegap = self.params['omegap']
-            E0 = m_e*c*omegap/e
-      
-      plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs), plt.colorbar()      
+    def map(self, field_name, iteration, coord=None, theta=0, m='all', norm = False, **kwargs):
+        """
+        Method to get a 2D-map of passed field_name
+        **Parameters**
+         field_name: string, field to plot
+         iteration: int, the same as usual
+         coord, theta, m: same parameters of .get_field() method; same defaults (None, 0, 'all')
+         norm: bool, optional;
+                 If norm = True this set the usual normalization of specified field, i.e:
+                    - e*n_e for charge density 'rho'; this return normalized density
+                    - m_e*c*omega_0/e for transverse 'E'
+                    - m_e*c*omega_p/e for longitudinal 'E'
+         **kwargs: keywords to pass to .pyplot.imshow() function
+
+        """
+        E, info_e = self.ts.get_field(field=field_name, coord=coord, iteration=iteration, theta=theta, m=m)
+        E0 = 1
+        n_e = self.params['n_e']
+        if norm:
+            if field_name == 'rho':
+                E0 = -e*n_e
+            elif coord in ['x', 'y', 'r', 't']:
+                omega0 = self.params['omega0']
+                E0 = m_e *c*omega0/e
+            else:
+                omegap = self.params['omegap']
+                E0 = m_e*c*omegap/e
+
+        plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs)
+        plt.colorbar()
 
 ################# bunch_properties_evolution ################
-   def bunch_properties_evolution(self, select, species='electrons', **kwargs):
+    def bunch_properties_evolution(self, select, species='electrons', **kwargs):
       """
       Method to select a bunch and to plot the evolution of 
       its characteristics along propagation length
@@ -232,54 +237,107 @@ class Diag(object):
        fig, ax: Figure, Axes to handle the plot output
              
       """
-      ptcl_percent = self.params['ptcl_percent']
-      emit, sigma_x2, sigma_ux2, charge = [],[],[],[]
-      z = c*self.t*1.e6  #in microns
+        ptcl_percent = self.params['ptcl_percent']
+        emit, sigma_x2, sigma_ux2, charge = list(), list(), list(), list()
+        z = c*self.t*1.e6  #in microns
 
-      for i in self.iterations:
-         x, ux, w = self.ts.get_particle(['x','ux','w'], iteration=i, select=select, species=species)
-         l, m, n = self.emittance_t(x, ux, w)
-         emit.append(l)
-         sigma_x2.append(m)
-         sigma_ux2.append(n)
-         charge.append(w.sum()*e/ptcl_percent)
+        for i in self.iterations:
+            x, ux, w = self.ts.get_particle(['x','ux','w'], iteration=i, select=select, species=species)
+            l, m, n = self.emittance_t(x, ux, w)
+            emit.append(l)
+            sigma_x2.append(m)
+            sigma_ux2.append(n)
+            charge.append(w.sum()*e/ptcl_percent)
 
-      fig, ax = plt.subplots(2, 2, figsize=(10,10))
-      
-      ax[0,0].plot(z, emit, **kwargs), ax[0,0].set_title('emit')
-      ax[0,1].plot(z, sigma_x2, **kwargs), ax[0,1].set_title('beam size')
-      ax[1,0].plot(z, sigma_ux2, **kwargs), ax[1,0].set_title('momenta spread')
-      ax[1,1].plot(z, charge, **kwargs), ax[1,1].set_title('charge')
-      plt.tight_layout()
+        fig, ax = plt.subplots(2, 2, figsize=(10,10))
 
-      emit = np.array(emit)
-      sigma_x2 = np.array(sigma_x2)
-      sigma_ux2 = np.array(sigma_ux2)
-      charge = np.array(charge)
-      
-      prop={'emit':emit,'sigma_x2':sigma_x2,'sigma_ux2':sigma_ux2,'charge':charge}
-      
-      return prop, fig, ax
+        ax[0,0].plot(z, emit, **kwargs)
+        ax[0,0].set_title('emit')
+        ax[0,1].plot(z, sigma_x2, **kwargs)
+        ax[0,1].set_title('beam size')
+        ax[1,0].plot(z, sigma_ux2, **kwargs)
+        ax[1,0].set_title('momenta spread')
+        ax[1,1].plot(z, charge, **kwargs)
+        ax[1,1].set_title('charge')
+
+        plt.tight_layout()
+
+        emit = np.array(emit)
+        sigma_x2 = np.array(sigma_x2)
+        sigma_ux2 = np.array(sigma_ux2)
+        charge = np.array(charge)
+
+        prop={'emit':emit,'sigma_x2':sigma_x2,'sigma_ux2':sigma_ux2,'charge':charge}
+
+        return prop, fig, ax
 ######################## spectrum ###################
-   def spectrum(self,iteration, select=None, species='electrons', **kwargs):
-      """
-      Method to easily get an energy spectrum of 'selected' particles
-      **Parameters**
-       iteration: int, which iteration we need
-       select: particle select, dictionary o ParticleTracker istance
-       species: string, optional: default is 'electrons'
-       **kwargs: keyword to pass to .hist() method
-      **Returns**
-       ax: axes.Axes object to handle
-      """
-      ptcl_percent = self.params['ptcl_percent']
-   
-      gamma, w = self.ts.get_particle(['gamma','w'], iteration=iteration, species=species, select=select)
-      
-      ax=plt.subplot(111)
-      values, bins, patches = ax.hist(0.511*gamma, weights=ptcl_percent*w, **kwargs) #needed values output as self.values? I'll see
-      del values, bins, patches
-      
-      return ax   
+    def spectrum(self,iteration, select=None, species='electrons', **kwargs):
+        """
+        Method to easily get an energy spectrum of 'selected' particles
+        **Parameters**
+            iteration: int, which iteration we need
+            select: particle select, dictionary o ParticleTracker istance
+            species: string, optional: default is 'electrons'
+            **kwargs: keyword to pass to .hist() method
+        **Returns**
+            ax: axes.Axes object to handle
+        """
+        ptcl_percent = self.params['ptcl_percent']
+
+        gamma, w = self.ts.get_particle(['gamma','w'], iteration=iteration, species=species, select=select)
+
+        ax=plt.subplot(111)
+        values, bins, patches = ax.hist(0.511*gamma, weights=ptcl_percent*w, **kwargs) #needed values output as self.values? I'll see
+        del values, bins, patches
+
+        return ax   
 
                      
+    def phase_space_hist(self, species, iteration, component1='z', component2='uz', select=None, **kwargs):
+        """
+        Method that plots a 2D histogram of the particles phase space.
+
+        Parameters:
+        ----------
+        species: str
+            Select the particle specie among the available ones
+            (Check them out in avail_species)
+        iteration: int
+            Selected iteration
+        component1: str
+            First phase space component of the phase space plot
+            (Check the available components in avail_record_components)
+        component2: str
+            Second phase space component of the phase space plot
+            (Check the available components in avail_record_components)
+        select: dict
+            Particle selector
+        """
+        cmap = 'Reds'
+        bins = 1000
+        density = True
+        alpha = 1
+
+        if 'cmap' in kwargs:
+            cmap = kwargs['cmap']
+            del kwargs['cmap']
+
+        if 'bins' in kwargs:
+            bins = kwargs['bins']
+            del kwargs['bins']
+
+        if 'density' in kwargs:
+            density = kwargs['density']
+            del kwargs['density']
+
+        if 'alpha' in kwargs:
+            alpha = kwargs['alpha']
+            del kwargs['alpha']
+
+        comp1, comp2, weight = self.ts.get_particle([component1, component2, 'w'], iteration=iteration, select=select, species=species)
+
+        H, xedge, yedge = np.histogram2d(comp1, comp2, bins=bins, weights=weight, density=density)
+        H = H.T
+        X, Y = np.meshgrid(xedge, yedge)
+        H = np.ma.masked_where(H == 0, H)
+        plt.pcolormesh(X, Y, H, cmap=cmap, alpha=alpha)
