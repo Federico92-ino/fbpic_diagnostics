@@ -12,7 +12,10 @@ from scipy.constants import e, m_e, c, pi, epsilon_0
 
 ######################### Diag ###############################
 class Diag(object):
-
+   """
+   A class to handle diagnostics of a plasma simulation; pass the path of hd5f files 
+   
+   """
    def __init__(self, path):
       self.ts = OpenPMDTimeSeries(path)
       self.params = json.load( open('params.json'))
@@ -92,7 +95,7 @@ class Diag(object):
          N: int, number of slices 
       **Returns**
          S_prop: a dictionary of properties of each slice: emittance, size, momenta spread and phase_space of each slice
-         Ph_space: an arrays' dictionary of 'x'-'ux' values of three slices taken at z_mean, (z_mean-z_var) and (z_mean+z_var)
+         Ph_space: an arrays' dictionary of 'x'-'ux'-'z' values of three slices taken at z_mean, (z_mean-z_dev) and (z_mean+z_dev)
          dz: longitudinal slices' thickness 
 
       Note: here indexing of dict_keys labels over slices   
@@ -140,6 +143,21 @@ class Diag(object):
 
 ############### lineout #####################
    def lineout(self, field_name, iteration, coord=None, theta=0, m='all', norm=False, **kwargs):
+      """
+      Method to get a lineout plot of passed field_name
+      **Parameters**
+       field_name: string, field to plot
+       iteration: int, the same as usual
+       coord, theta, m: same parameters of .get_field() method; same defaults (None, 0, 'all')
+       norm: bool, optional;
+             If norm = True this set the usual normalization of specified field, i.e:
+               - e*n_e for charge density 'rho'
+               - m_e*c*omega_0/e for transverse 'E'
+               - m_e*c*omega_p/e for longitudinal 'E'
+       **kwargs: keywords to pass to .pyplot.plot() function
+      
+      """
+
       E, info_e = self.ts.get_field(field=field_name, coord=coord, iteration=iteration, theta=theta, m=m)
       E0 = 1
       Nr = self.params['Nr']
@@ -154,10 +172,24 @@ class Diag(object):
             omegap = self.params['omegap']
             E0 = m_e*c*omegap/e
 
-      plt.plot(info_e.z*1.e6,E[Nr,:]/E0,**kwargs)
+      plt.plot(info_e.z*1.e6, E[Nr,:]/E0, **kwargs)
 
 ################# map ####################
    def map(self, field_name, iteration, coord=None, theta=0, m='all', norm = False, **kwargs):
+      """
+      Method to get a 2D-map of passed field_name
+      **Parameters**
+       field_name: string, field to plot
+       iteration: int, the same as usual
+       coord, theta, m: same parameters of .get_field() method; same defaults (None, 0, 'all')
+       norm: bool, optional;
+             If norm = True this set the usual normalization of specified field, i.e:
+               - e*n_e for charge density 'rho'; this return normalized density
+               - m_e*c*omega_0/e for transverse 'E'
+               - m_e*c*omega_p/e for longitudinal 'E'
+       **kwargs: keywords to pass to .pyplot.imshow() function
+      
+      """
       E, info_e = self.ts.get_field(field=field_name, coord=coord, iteration=iteration, theta=theta, m=m)
       E0 = 1
       n_e = self.params['n_e']
@@ -171,17 +203,43 @@ class Diag(object):
             omegap = self.params['omegap']
             E0 = m_e*c*omegap/e
       
-      plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs)      
+      plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs), plt.colorbar()      
 
 ################# bunch_properties_evolution ################
-   def bunch_properties_evolution(self, select, iteration, ptcl_percent=1, **kwargs):
-      
-      pt = ParticleTracker(self.ts, iteration=iteration,select=select)
+   def bunch_properties_evolution(self, select, species='electrons', ptcl_percent=1, **kwargs):
+      """
+      Method to select a bunch and to plot the evolution of 
+      its characteristics along propagation length
+       
+      **Parameters**
+       select: dict or ParticleTracker object, optional
+            - If `select` is a dictionary:
+            then it lists a set of rules to select the particles, of the form
+            'x' : [-4., 10.]   (Particles having x between -4 and 10 microns)
+            'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
+            'uz' : [5., None]  (Particles with uz above 5 mc)
+            - If `select` is a ParticleTracker object:
+            then it returns particles that have been selected at another
+            iteration ; see the docstring of `ParticleTracker` for more info.
+       species: string
+            A string indicating the name of the species
+            This is optional if there is only one species; default is 'electrons'.
+       ptcl_percent: float
+            A number in [0,1] range that tells the particles percent output from simulation;
+            default is 1.
+       **kwargs: keyword to pass to .pyplot.plot()
+      **Returns**
+       prop: dictionary
+            A dict of bunch's properties values: emittance, beam size, momenta spread and beam charge
+       fig, ax: Figure, Axes to handle the plot output
+             
+      """
+     
       emit, sigma_x2, sigma_ux2, charge = [],[],[],[]
       z = c*self.t*1.e6  #in microns
 
       for i in self.iterations:
-         x, ux, w = self.ts.get_particle(['x','ux','w'], iteration=i, select=pt)
+         x, ux, w = self.ts.get_particle(['x','ux','w'], iteration=i, select=select, species=species)
          l, m, n = self.emittance_t(x, ux, w)
          emit.append(l)
          sigma_x2.append(m)
@@ -196,6 +254,11 @@ class Diag(object):
       ax[1,1].plot(z, charge, **kwargs), ax[1,1].set_title('charge')
       plt.tight_layout()
 
+      emit = np.array(emit)
+      sigma_x2 = np.array(sigma_x2)
+      sigma_ux2 = np.array(sigma_ux2)
+      charge = np.array(charge)
+      
       prop={'emit':emit,'sigma_x2':sigma_x2,'sigma_ux2':sigma_ux2,'charge':charge}
       
       return prop, fig, ax
