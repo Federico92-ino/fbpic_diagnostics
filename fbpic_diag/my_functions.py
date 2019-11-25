@@ -19,11 +19,11 @@ class Diag(object):
         self.ts = OpenPMDTimeSeries(path)
         self.params = json.load( open('params.json'))
         self.iterations = self.ts.iterations
-        self.t=self.ts.t
-        self.avail_fields = ts.avail_fields
-        self.avail_geom = ts.avail_geom
-        self.avail_species = ts.avail_species
-        self.avail_record_components = ts.avail_record_components
+        self.t = self.ts.t
+        self.avail_fields = self.ts.avail_fields
+        self.avail_geom = self.ts.avail_geom
+        self.avail_species = self.ts.avail_species
+        self.avail_record_components = self.ts.avail_record_components
 
 ###################### read_properties #########################
     def read_properties (self, var_list, **kwargs):
