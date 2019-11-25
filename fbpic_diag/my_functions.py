@@ -206,7 +206,7 @@ class Diag(object):
       plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs), plt.colorbar()      
 
 ################# bunch_properties_evolution ################
-   def bunch_properties_evolution(self, select, species='electrons', ptcl_percent=1, **kwargs):
+   def bunch_properties_evolution(self, select, species='electrons', **kwargs):
       """
       Method to select a bunch and to plot the evolution of 
       its characteristics along propagation length
@@ -224,9 +224,7 @@ class Diag(object):
        species: string
             A string indicating the name of the species
             This is optional if there is only one species; default is 'electrons'.
-       ptcl_percent: float
-            A number in [0,1] range that tells the particles percent output from simulation;
-            default is 1.
+       
        **kwargs: keyword to pass to .pyplot.plot()
       **Returns**
        prop: dictionary
@@ -234,7 +232,7 @@ class Diag(object):
        fig, ax: Figure, Axes to handle the plot output
              
       """
-     
+      ptcl_percent = self.params['ptcl_percent']
       emit, sigma_x2, sigma_ux2, charge = [],[],[],[]
       z = c*self.t*1.e6  #in microns
 
@@ -262,6 +260,26 @@ class Diag(object):
       prop={'emit':emit,'sigma_x2':sigma_x2,'sigma_ux2':sigma_ux2,'charge':charge}
       
       return prop, fig, ax
+######################## spectrum ###################
+def spectrum(self,iteration, select=None, species='electrons', **kwargs):
+   """
+   Method to easily get an energy spectrum of 'selected' particles
+   **Parameters**
+    iteration: int, which iteration we need
+    select: particle select, dictionary o ParticleTracker istance
+    species: string, optional: default is 'electrons'
+    **kwargs: keyword to pass to .hist() method
+   **Returns**
+    ax: axes.Axes object to handle
+   """
+   ptcl_percent = self.params['ptcl_percent']
+
+   gamma, w = self.ts.get_particle(['gamma','w'], iteration=iteration, species=species, select=select)
    
+   ax=plt.subplot(111)
+   values, bins, patches = ax.hist(0.511*gamma, weights=ptcl_percent*w, **kwargs) #needed values output as self.values? I'll see
+   del values, bins, patches
+   
+   return ax   
 
                      
