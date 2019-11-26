@@ -22,7 +22,7 @@ setup(
     author_email='federico.avella@ino.it',
     # maintainer='Davide Terzani',
     # maintainer_email='davide.terzani@ino.it',
-    license ='GNU GPLv3',
+    license='GNU GPLv3',
     url='https://github.com/Federico92-ino/fbpic_diagnostics.git',
     # classifiers=[
     #     'Programming Language :: Python',
