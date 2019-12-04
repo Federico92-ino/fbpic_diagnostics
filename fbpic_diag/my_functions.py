@@ -24,6 +24,25 @@ class Diag(object):
         self.avail_geom = self.ts.avail_geom
         self.avail_species = self.ts.avail_species
         self.avail_record_components = self.ts.avail_record_components
+    
+    def __normalize__(self, field_name, coord, N):
+        if N is None:
+            n_e = self.params['n_e']
+            omega0 = self.params['omega0']
+            omegap = self.params['omegap']
+
+            if field_name == 'rho':
+                N = -e*n_e
+            elif field_name == 'J':
+                N = -e*n_e*c
+            elif field_name == 'E':
+                if coord == 'z':
+                    N = m_e*omegap*c/e
+                elif coord in ['x', 'y', 'r', 't']:
+                    N = m_e*omega0*c/e
+            elif field_name == 'B':
+                N = m_e*omega0/e
+        return N
 
     def read_properties(self, var_list, **kwargs):
 
@@ -156,7 +175,7 @@ class Diag(object):
         return S_prop, Ph_space, dz
 
     def lineout(self, field_name, iteration,
-                coord=None, theta=0, m='all', norm=False, **kwargs):
+                coord=None, theta=0, m='all', norm=False, N=None, zeta_coord=False, **kwargs):
         """
         Method to get a lineout plot of passed field_name
 
@@ -168,13 +187,24 @@ class Diag(object):
                     The same as usual
             coord, theta, m: same parameters of .get_field() method.
                     Same defaults (None, 0, 'all')
-            norm: bool, optional;
-                    If norm=True this set the usual normalization
-                    of specified field, i.e:
-                    - e*n_e for charge density 'rho'
+            norm: bool, optional
+                    If norm=True this 'turns on' the normalization.
+                    Default is 'False'.
+            N: float, optional
+                    If norm=True this allows to set the normilizing costant.
+                    Default is 'None: in this case normalization is set to
+                    usual units, e.g:
+                    - e*n_e for charge density 'rho'; this returns normalized density
                     - m_e*c*omega_0/e for transverse 'E'
                     - m_e*c*omega_p/e for longitudinal 'E'
+            zeta_coord: bool, optional
+                    If 'True' transforms z coords into z-v_w*t coords;
+                    v_w is moving window velocity. Dafault is 'False'
             **kwargs: keywords to pass to .pyplot.plot() function
+
+        **Return**
+
+            ax: a matplotlib.axes.Axes instance
 
         """
 
@@ -182,21 +212,19 @@ class Diag(object):
                                       iteration=iteration, theta=theta, m=m)
         E0 = 1
         Nr = self.params['Nr']
-        n_e = self.params['n_e']
         if norm:
-            if field_name == 'rho':
-                E0 = -e*n_e
-            elif coord in ['x', 'y', 'r', 't']:
-                omega0 = self.params['omega0']
-                E0 = m_e*c*omega0/e
-            else:
-                omegap = self.params['omegap']
-                E0 = m_e*c*omegap/e
-
-        plt.plot(info_e.z*1.e6, E[Nr, :]/E0, **kwargs)
+            E0 = self.__normalize__(field_name, coord, N)
+        fig, ax = plt.subplots(1, 1)
+        z = info_e.z*1.e6
+        if zeta_coord:
+            v_w = self.params['v_window']
+            t = self.ts.current_t
+            z = (info_e.z-v_w*t)*1.e6
+        ax.plot(z, E[Nr, :]/E0, **kwargs)
+        return fig, ax
 
     def map(self, field_name, iteration,
-            coord=None, theta=0, m='all', norm=False, **kwargs):
+            coord=None, theta=0, m='all', norm=False, N=None, **kwargs):
         """
         Method to get a 2D-map of passed field_name
 
@@ -209,30 +237,30 @@ class Diag(object):
             coord, theta, m: same parameters of .get_field() method.
                          Same defaults (None, 0, 'all')
             norm: bool, optional;
-                    If norm = True this set the usual
-                    normalization of specified field, i.e:
-                    - e*n_e for charge density 'rho'; this return normalized density
+                    If norm=True this 'turns on' the normalization.
+                    Default is 'False'.
+            N: float, optional;
+                    If norm=True this allows to set the normilizing costant.
+                    Default is 'None: in this case normalization is set to
+                    usual units, e.g:
+                    - e*n_e for charge density 'rho'; this returns normalized density
                     - m_e*c*omega_0/e for transverse 'E'
                     - m_e*c*omega_p/e for longitudinal 'E'
             **kwargs: keywords to pass to .pyplot.imshow() function
+        **Return**
+
+            ax: a matplotlib.axes.Axes instance
 
         """
         E, info_e = self.ts.get_field(field=field_name, coord=coord,
                                       iteration=iteration, theta=theta, m=m)
         E0 = 1
-        n_e = self.params['n_e']
         if norm:
-            if field_name == 'rho':
-                E0 = -e*n_e
-            elif coord in ['x', 'y', 'r', 't']:
-                omega0 = self.params['omega0']
-                E0 = m_e*c*omega0/e
-            else:
-                omegap = self.params['omegap']
-                E0 = m_e*c*omegap/e
-
-        plt.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs)
-        plt.colorbar()
+            E0 = self.__normalize__(field_name, coord, N)
+        fig, ax = plt.subplots(1, 1)
+        ax.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs)
+        fig.colorbar(ax, ax=ax, use_gridspec=True)
+        return fig, ax
 
     def bunch_properties_evolution(self, select, species='electrons', **kwargs):
         """
@@ -378,4 +406,4 @@ class Diag(object):
         H = H.T
         X, Y = np.meshgrid(xedge, yedge)
         H = np.ma.masked_where(H == 0, H)
-        plt.pcolormesh(X, Y, H, cmap=cmap, alpha=alpha)
+        plt.pcolormesh(X, Y, H, cmap=cmap, alpha=alpha)    
