@@ -214,14 +214,12 @@ class Diag(object):
         Nr = self.params['Nr']
         if norm:
             E0 = self.__normalize__(field_name, coord, N)
-        fig, ax = plt.subplots(1, 1)
         z = info_e.z*1.e6
         if zeta_coord:
             v_w = self.params['v_window']
             t = self.ts.current_t
             z = (info_e.z-v_w*t)*1.e6
-        ax.plot(z, E[Nr, :]/E0, **kwargs)
-        return fig, ax
+        plt.plot(z, E[Nr, :]/E0, **kwargs)
 
     def map(self, field_name, iteration,
             coord=None, theta=0, m='all', norm=False, N=None, **kwargs):
