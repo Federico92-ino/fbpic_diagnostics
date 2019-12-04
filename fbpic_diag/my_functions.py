@@ -259,7 +259,7 @@ class Diag(object):
             E0 = self.__normalize__(field_name, coord, N)
         fig, ax = plt.subplots(1, 1)
         ax.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs)
-        fig.colorbar(ax, ax=ax, use_gridspec=True)
+        fig.colorbar(ax.get_images()[0], ax=ax, use_gridspec=True)
         return fig, ax
 
     def bunch_properties_evolution(self, select, species='electrons', **kwargs):
