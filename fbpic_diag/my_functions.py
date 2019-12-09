@@ -325,7 +325,7 @@ class Diag(object):
 
         return prop, fig, ax
 
-    def spectrum(self, iteration, select=None, species='electrons', **kwargs):
+    def spectrum(self, iteration, select=None, species='electrons', charge=False, **kwargs):
         """
         Method to easily get an energy spectrum of 'selected' particles
 
@@ -337,6 +337,10 @@ class Diag(object):
                 Particle selector
             species: str, optional
                 Default is 'electrons'
+            charge: bool, optional
+                If True this sets the y-axis on dQ/dE values,
+                multipling the weights for electron charge.
+                Default is False, that means setting y-axis on dN/dE values
             **kwargs: keyword to pass to .hist() method
 
         **Returns**
@@ -344,14 +348,16 @@ class Diag(object):
             ax: axes.Axes object to handle
 
         """
-        ptcl_percent = self.params['subsampling_fraction']
-
+        in_ptcl_percent = 1/self.params['subsampling_fraction']
+        q = 1
+        if charge:
+            q = e
         gamma, w = self.ts.get_particle(['gamma', 'w'], iteration=iteration,
                                         species=species, select=select)
 
         ax = plt.subplot(111)
         values, bins, patches = ax.hist(0.511*gamma,
-                                        weights=ptcl_percent*w, **kwargs)  # needed values output as self.values? I'll see
+                                        weights=q*in_ptcl_percent*w, **kwargs)  # needed values output as self.values? I'll see
         del values, bins, patches
 
         return ax
