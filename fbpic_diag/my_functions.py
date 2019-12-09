@@ -112,14 +112,14 @@ class Diag(object):
         emit = np.sqrt(sigma_x2*sigma_ux2 - sigma_xux**2)
         return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
 
-    def slice_emit(self, dict, N):
+    def slice_emit(self, N, **kwargs):
         """
         Function to calculate slice emittances of a 'N sliced' bunch
 
         **Parameters**
 
-            dict: a "read_properties" dictionary
             N: int, number of slices
+            **kwargs: same parameters of .get_particle(), except 'var_list'
 
         **Returns**
 
@@ -133,7 +133,12 @@ class Diag(object):
         Note: here indexing of dict_keys labels over slices
 
         """
-        dz = (dict['z'].max()-dict['z'].min())/N
+        if kwargs['var_list']:
+            raise Exception("You don't need to pass 'var_list' argument!\n \
+                             Try again with just the others kwargs of .get_particle()" )
+
+        dictionary = self.read_properties(['x','ux','z','w'],**kwargs)
+        dz = (dictionary['z'].max()-dictionary['z'].min())/N
 
         s_emit = list()
         s_sigma_x2 = list()
@@ -143,17 +148,17 @@ class Diag(object):
         UX = list()
         ZZ = list()
 
-        a = dict['z'].argsort()
-        x = dict['x'][a]
-        ux = dict['ux'][a]
-        w = dict['w'][a]
-        dict['z'].sort()
+        a = dictionary['z'].argsort()
+        x = dictionary['x'][a]
+        ux = dictionary['ux'][a]
+        w = dictionary['w'][a]
+        z = dictionary['z'].sort()
 
         for n in range(N):
-            inds = np.where((dict['z'] >= dict['z'].min()+n*dz) &
-                            (dict['z'] <= dict['z'].min()+(n+1)*dz))[0]
+            inds = np.where((z >= z.min()+n*dz) &
+                            (z <= z.min()+(n+1)*dz))[0]
 
-            Z.append(dict['z'][inds].mean())
+            Z.append(z[inds].mean())
 
             s_prop = self.emittance_t(x[inds], ux[inds], w[inds])
             s_emit.append(s_prop[0])
@@ -164,11 +169,11 @@ class Diag(object):
                   's_sigma_ux2': s_sigma_ux2, 'z': Z}
 
         for n in range(-1, 1):
-            inds = np.where((dict['z'] >= dict['z'].mean()+np.sqrt((n*dict['z'].var()))-dz/2) &
-                            (dict['z'] <= dict['z'].mean()+np.sqrt((n*dict['z'].var()))+dz/2))
+            inds = np.where((z >= z.mean()+np.sqrt((n*z.var()))-dz/2) &
+                            (z <= z.mean()+np.sqrt((n*z.var()))+dz/2))
             X.append(x[inds])
             UX.append(ux[inds])
-            ZZ.append(dict['z'][inds])
+            ZZ.append(z[inds])
 
         Ph_space = {'x': X, 'ux': UX, 'z': ZZ}
 
@@ -201,10 +206,6 @@ class Diag(object):
                     If 'True' transforms z coords into z-v_w*t coords;
                     v_w is moving window velocity. Dafault is 'False'
             **kwargs: keywords to pass to .pyplot.plot() function
-
-        **Return**
-
-            ax: a matplotlib.axes.Axes instance
 
         """
 
@@ -244,7 +245,7 @@ class Diag(object):
                     - e*n_e for charge density 'rho'; this returns normalized density
                     - m_e*c*omega_0/e for transverse 'E'
                     - m_e*c*omega_p/e for longitudinal 'E'
-            **kwargs: keywords to pass to .pyplot.imshow() function
+            **kwargs: keywords to pass to .Axes.imshow() method
         **Return**
 
             ax: a matplotlib.axes.Axes instance
@@ -270,8 +271,8 @@ class Diag(object):
             select: dict or ParticleTracker object, optional
               - If `select` is a dictionary:
               then it lists a set of rules to select the particles, of the form
-              'x' : [-4., 10.]   (Particles having x between -4 and 10 microns)
               'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
+              'x' : [-4., 10.]   (Particles having x between -4 and 10 microns)
               'uz' : [5., None]  (Particles with uz above 5 mc)
               - If `select` is a ParticleTracker object:
               then it returns particles that have been selected at another
@@ -289,7 +290,7 @@ class Diag(object):
             fig, ax: Figure, Axes to handle the plot output
 
         """
-        ptcl_percent = self.params['ptcl_percent']
+        ptcl_percent = self.params['subsampling_fraction']
         emit, sigma_x2, sigma_ux2, charge = list(), list(), list(), list()
         z = c*self.t*1.e6  # in microns
 
@@ -343,7 +344,7 @@ class Diag(object):
             ax: axes.Axes object to handle
 
         """
-        ptcl_percent = self.params['ptcl_percent']
+        ptcl_percent = self.params['subsampling_fraction']
 
         gamma, w = self.ts.get_particle(['gamma', 'w'], iteration=iteration,
                                         species=species, select=select)
