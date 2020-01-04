@@ -257,7 +257,11 @@ class Diag(object):
         if norm:
             E0 = self.__normalize__(field_name, coord, N)
         fig, ax = plt.subplots(1, 1)
-        ax.imshow(E/E0, extent=info_e.imshow_extent*1.e6, **kwargs)
+        origin = 'low'
+        if 'origin' in kwargs:
+            origin = kwargs['origin']
+            del kwargs['origin']
+        ax.imshow(E/E0, extent=info_e.imshow_extent*1.e6, origin=origin, **kwargs)
         fig.colorbar(ax.get_images()[0], ax=ax, use_gridspec=True)
         return fig, ax
 
@@ -362,7 +366,7 @@ class Diag(object):
 
         return ax
 
-    def phase_space_hist(self, species, iteration, component1='z', component2='uz', select=None, **kwargs):
+    def phase_space_hist(self, species, iteration, component1='z', component2='uz', select=None, zeta_coord=False, **kwargs):
         """
         Method that plots a 2D histogram of the particles phase space.
 
@@ -406,9 +410,17 @@ class Diag(object):
         comp1, comp2, weight = self.ts.get_particle([component1, component2, 'w'],
                                                     iteration=iteration, select=select, species=species)
 
+        if component1 == 'z' and zeta_coord:
+            t = self.ts.current_t
+            comp1 -= c*t*1.e6
+
+        if component2 == 'z' and zeta_coord:
+            t = self.ts.current_t
+            comp2 -= c*t*1.e6
+
         H, xedge, yedge = np.histogram2d(comp1, comp2,
                                          bins=bins, weights=weight, density=density)
         H = H.T
         X, Y = np.meshgrid(xedge, yedge)
         H = np.ma.masked_where(H == 0, H)
-        plt.pcolormesh(X, Y, H, cmap=cmap, alpha=alpha)    
+        plt.pcolormesh(X, Y, H, cmap=cmap, alpha=alpha)
