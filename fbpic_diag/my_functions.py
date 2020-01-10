@@ -133,7 +133,7 @@ class Diag(object):
         Note: here indexing of dict_keys labels over slices
 
         """
-        if kwargs['var_list']:
+        if 'var_list' in kwargs:
             raise Exception("You don't need to pass 'var_list' argument!\n \
                              Try again with just the others kwargs of .get_particle()" )
 
@@ -152,7 +152,8 @@ class Diag(object):
         x = dictionary['x'][a]
         ux = dictionary['ux'][a]
         w = dictionary['w'][a]
-        z = dictionary['z'].sort()
+        dictionary['z'].sort()
+        z = dictionary['z']
 
         for n in range(N):
             inds = np.where((z >= z.min()+n*dz) &
@@ -180,7 +181,7 @@ class Diag(object):
         return S_prop, Ph_space, dz
 
     def lineout(self, field_name, iteration,
-                coord=None, theta=0, m='all', norm=False, N=None, zeta_coord=False, **kwargs):
+                coord=None, theta=0, m='all', normalize=False, N=None, zeta_coord=False, **kwargs):
         """
         Method to get a lineout plot of passed field_name
 
@@ -192,11 +193,11 @@ class Diag(object):
                     The same as usual
             coord, theta, m: same parameters of .get_field() method.
                     Same defaults (None, 0, 'all')
-            norm: bool, optional
-                    If norm=True this 'turns on' the normalization.
+            normalize: bool, optional
+                    If normalize=True this 'turns on' the normalization.
                     Default is 'False'.
             N: float, optional
-                    If norm=True this allows to set the normilizing costant.
+                    If normalize=True this allows to set the normilizing costant.
                     Default is 'None: in this case normalization is set to
                     usual units, e.g:
                     - e*n_e for charge density 'rho'; this returns normalized density
@@ -213,7 +214,7 @@ class Diag(object):
                                       iteration=iteration, theta=theta, m=m)
         E0 = 1
         Nr = self.params['Nr']
-        if norm:
+        if normalize:
             E0 = self.__normalize__(field_name, coord, N)
         z = info_e.z*1.e6
         if zeta_coord:
@@ -223,7 +224,7 @@ class Diag(object):
         plt.plot(z, E[Nr, :]/E0, **kwargs)
 
     def map(self, field_name, iteration,
-            coord=None, theta=0, m='all', norm=False, N=None, **kwargs):
+            coord=None, theta=0, m='all', normalize=False, N=None, **kwargs):
         """
         Method to get a 2D-map of passed field_name
 
@@ -235,11 +236,11 @@ class Diag(object):
                     The same as usual
             coord, theta, m: same parameters of .get_field() method.
                          Same defaults (None, 0, 'all')
-            norm: bool, optional;
-                    If norm=True this 'turns on' the normalization.
+            normalize: bool, optional;
+                    If normalize=True this 'turns on' the normalization.
                     Default is 'False'.
             N: float, optional;
-                    If norm=True this allows to set the normilizing costant.
+                    If normalize=True this allows to set the normilizing costant.
                     Default is 'None: in this case normalization is set to
                     usual units, e.g:
                     - e*n_e for charge density 'rho'; this returns normalized density
@@ -254,7 +255,7 @@ class Diag(object):
         E, info_e = self.ts.get_field(field=field_name, coord=coord,
                                       iteration=iteration, theta=theta, m=m)
         E0 = 1
-        if norm:
+        if normalize:
             E0 = self.__normalize__(field_name, coord, N)
         fig, ax = plt.subplots(1, 1)
         origin = 'low'
@@ -265,7 +266,8 @@ class Diag(object):
         fig.colorbar(ax.get_images()[0], ax=ax, use_gridspec=True)
         return fig, ax
 
-    def bunch_properties_evolution(self, select, species='electrons', **kwargs):
+    def bunch_properties_evolution(self, select, species='electrons', 
+                                   output=False, zeta_coord=False, time=0., **kwargs):
         """
         Method to select a bunch and to plot the evolution of
         its characteristics along propagation length
@@ -281,10 +283,19 @@ class Diag(object):
               - If `select` is a ParticleTracker object:
               then it returns particles that have been selected at another
               iteration ; see the docstring of `ParticleTracker` for more info.
+              - If 'select' contains 'z' list:
+              selection is made in co-moving frame
             species: string
                 A string indicating the name of the species
                 This is optional if there is only one species; default is 'electrons'.
-
+            output: bool
+                If 'True' returns a dict of four arrays wich
+                contains bunch_properties values.
+            zeta_coord: bool
+                If 'True' the 'z' selection is done in co-moving frame
+            time: float
+                Specify the time (s) at which refers the 'z' selection.
+                Default is the first itertion, i.e. time = 0.0 s
             **kwargs: keyword to pass to .pyplot.plot()
 
         **Returns**
@@ -298,38 +309,61 @@ class Diag(object):
         emit, sigma_x2, sigma_ux2, charge = list(), list(), list(), list()
         z = c*self.t*1.e6  # in microns
 
-        for i in self.iterations:
-            x, ux, w = self.ts.get_particle(['x', 'ux', 'w'], iteration=i, select=select, species=species)
-            l, m, n = self.emittance_t(x, ux, w)
-            emit.append(l)
-            sigma_x2.append(m)
-            sigma_ux2.append(n)
-            charge.append(w.sum()*e/ptcl_percent)
+        if zeta_coord and 'z' in select:
+            if time != 0.:
+                time = time
+            else:
+                time = self.t[0]
+            for k,i in enumerate(self.iterations):
+                v_w = self.params['v_window']
+                select['z'] = [select['z'][0]+v_w*(self.t[k]-time),select['z'][1]+v_w*(self.t[k]-time)]
+                x, ux, w = self.ts.get_particle(['x', 'ux', 'w'], iteration=i, select=select, species=species)
+                l, m, n = self.emittance_t(x, ux, w)
+                emit.append(l)
+                sigma_x2.append(m)
+                sigma_ux2.append(n)
+                charge.append(w.sum()*e/ptcl_percent)
+        else:
+            for i in self.iterations:
+                x, ux, w = self.ts.get_particle(['x', 'ux', 'w'], iteration=i, select=select, species=species)
+                l, m, n = self.emittance_t(x, ux, w)
+                emit.append(l)
+                sigma_x2.append(m)
+                sigma_ux2.append(n)
+                charge.append(w.sum()*e/ptcl_percent)
 
         fig, ax = plt.subplots(2, 2, figsize=(10, 10))
 
         ax[0, 0].plot(z, emit, **kwargs)
+        ax[0, 0].xlim(left=z.min())
         ax[0, 0].set_title('emit')
+
         ax[0, 1].plot(z, sigma_x2, **kwargs)
+        ax[0, 1].xlim(left=z.min())
         ax[0, 1].set_title('beam size')
+
         ax[1, 0].plot(z, sigma_ux2, **kwargs)
+        ax[1, 0].xlim(left=z.min())
         ax[1, 0].set_title('momenta spread')
+
         ax[1, 1].plot(z, charge, **kwargs)
         ax[1, 1].set_title('charge')
 
         plt.tight_layout()
 
-        emit = np.array(emit)
-        sigma_x2 = np.array(sigma_x2)
-        sigma_ux2 = np.array(sigma_ux2)
-        charge = np.array(charge)
+        if output:
+            emit = np.array(emit)
+            sigma_x2 = np.array(sigma_x2)
+            sigma_ux2 = np.array(sigma_ux2)
+            charge = np.array(charge)
 
-        prop = {'emit': emit, 'sigma_x2': sigma_x2,
-                'sigma_ux2': sigma_ux2, 'charge': charge}
+            prop = {'emit': emit, 'sigma_x2': sigma_x2,
+                    'sigma_ux2': sigma_ux2, 'charge': charge}
+            return prop, fig, ax
+        else:
+            return fig, ax
 
-        return prop, fig, ax
-
-    def spectrum(self, iteration, select=None, species='electrons', charge=False, **kwargs):
+    def spectrum(self, iteration, select=None, species='electrons', energy=False, charge=False, **kwargs):
         """
         Method to easily get an energy spectrum of 'selected' particles
 
@@ -341,6 +375,10 @@ class Diag(object):
                 Particle selector
             species: str, optional
                 Default is 'electrons'
+            energy: bool, optional
+                If 'True' this sets the x-axis on energy(MeV),
+                otherwise x-axis has adimensional gamma values.
+                Default is 'False'.
             charge: bool, optional
                 If True this sets the y-axis on dQ/dE values,
                 multipling the weights for electron charge.
@@ -353,18 +391,15 @@ class Diag(object):
 
         """
         in_ptcl_percent = 1/self.params['subsampling_fraction']
+        a = 1
+        if energy:
+            a = 0.511
         q = 1
         if charge:
             q = e
         gamma, w = self.ts.get_particle(['gamma', 'w'], iteration=iteration,
                                         species=species, select=select)
-
-        ax = plt.subplot(111)
-        values, bins, patches = ax.hist(0.511*gamma,
-                                        weights=q*in_ptcl_percent*w, **kwargs)  # needed values output as self.values? I'll see
-        del values, bins, patches
-
-        return ax
+        plt.hist(a*gamma,weights=q*in_ptcl_percent*w, **kwargs)  # needed values output as self.values? I'll see
 
     def phase_space_hist(self, species, iteration, component1='z', component2='uz', select=None, zeta_coord=False, **kwargs):
         """
@@ -385,6 +420,8 @@ class Diag(object):
             (Check the available components in avail_record_components)
         select: dict
             Particle selector
+        zeta_coord: bool
+            If 'True' this sets the z values in co-moving frame
         """
         cmap = 'Reds'
         bins = 1000
