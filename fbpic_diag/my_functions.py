@@ -42,6 +42,8 @@ class Diag(object):
                     N = m_e*omega0*c/e
             elif field_name == 'B':
                 N = m_e*omega0/e
+            elif field_name == 'phi':
+                N = m_e*c**2/e
         return N
 
     def read_properties(self, var_list, **kwargs):
@@ -179,6 +181,45 @@ class Diag(object):
         Ph_space = {'x': X, 'ux': UX, 'z': ZZ}
 
         return S_prop, Ph_space, dz
+    
+    def energy_spread(self, gamma, w):
+        """
+        Function to calculate energy spread of bunch's energy spectra
+        **Parameters**
+            gamma: float, array
+                An array of normalized energy values 
+            w: float, array
+                An array of weights
+        """
+        mean = np.ma.average(gamma,weights=w)
+        mean2 = np.ma.average(gamma**2,weights=w)
+        sigma2 = (mean2 - mean**2)/mean**2
+
+        return np.sqrt(sigma2)
+
+    def potential(self, iteration, theta=0, m='all', phi_max = 0.):
+        """
+        Method to integrate electrostatic potential from longitudinal field Ez.
+
+        **Parameters**
+            iteration: int
+                The same as usual
+            theta, m:
+                Same parameters of .get_field() method.
+                Same defaults (0, 'all')
+            phi_max: float
+                The boundary value of potential at the right edge of the box
+        """
+        Ez, info_e = self.ts.get_field('E', coord='z', iteration=iteration, theta=theta, m=m)
+        Nr=self.params['Nr']
+        phi = list(np.zeros_like(Ez[Nr,:]))
+        max = Ez.shape[1]
+        phi.append(phi_max)
+        for i in range(max):
+            phi[(max-1)-i] = np.trapz(Ez[Nr,max-i-1:max-i+1],dx=info_e.dz) + phi[max-i]
+        phi.pop()
+        phi = np.array(phi)
+        return phi, info_e
 
     def lineout(self, field_name, iteration,
                 coord=None, theta=0, m='all', normalize=False, N=None, zeta_coord=False, **kwargs):
@@ -209,19 +250,26 @@ class Diag(object):
             **kwargs: keywords to pass to .pyplot.plot() function
 
         """
-
-        E, info_e = self.ts.get_field(field=field_name, coord=coord,
-                                      iteration=iteration, theta=theta, m=m)
-        E0 = 1
         Nr = self.params['Nr']
+
+        if field_name == 'phi':
+            E, info_e = self.potential(iteration,theta=theta,m=m)
+        else:
+            E, info_e = self.ts.get_field(field=field_name, coord=coord,
+                                          iteration=iteration, theta=theta, m=m)
+            E = E[Nr,:]
+        E0 = 1
+
         if normalize:
             E0 = self.__normalize__(field_name, coord, N)
         z = info_e.z*1.e6
+
         if zeta_coord:
             v_w = self.params['v_window']
             t = self.ts.current_t
             z = (info_e.z-v_w*t)*1.e6
-        plt.plot(z, E[Nr, :]/E0, **kwargs)
+
+        plt.plot(z, E/E0, **kwargs)
 
     def map(self, field_name, iteration,
             coord=None, theta=0, m='all', normalize=False, N=None, **kwargs):
@@ -254,9 +302,11 @@ class Diag(object):
         """
         E, info_e = self.ts.get_field(field=field_name, coord=coord,
                                       iteration=iteration, theta=theta, m=m)
+
         E0 = 1
         if normalize:
             E0 = self.__normalize__(field_name, coord, N)
+
         fig, ax = plt.subplots(1, 1)
         origin = 'low'
         if 'origin' in kwargs:
@@ -264,6 +314,7 @@ class Diag(object):
             del kwargs['origin']
         ax.imshow(E/E0, extent=info_e.imshow_extent*1.e6, origin=origin, **kwargs)
         fig.colorbar(ax.get_images()[0], ax=ax, use_gridspec=True)
+
         return fig, ax
 
     def bunch_properties_evolution(self, select, species='electrons', 
@@ -289,7 +340,7 @@ class Diag(object):
                 A string indicating the name of the species
                 This is optional if there is only one species; default is 'electrons'.
             output: bool
-                If 'True' returns a dict of four arrays wich
+                If 'True' returns a dict of five np.arrays wich
                 contains bunch_properties values.
             zeta_coord: bool
                 If 'True' the 'z' selection is done in co-moving frame
@@ -300,65 +351,78 @@ class Diag(object):
 
         **Returns**
 
-            prop: dictionary
-                A dict of bunch's properties values: emittance, beam size, momenta spread and beam charge
-            fig, ax: Figure, Axes to handle the plot output
+            prop: dictionary, if 'output' is 'True'
+                A dict of bunch's properties values: emittance, beam size, 
+                momenta spread, energy spread and beam charge
+            fig, ax: Figure, Axes
+                To handle the plot output
 
         """
         ptcl_percent = self.params['subsampling_fraction']
-        emit, sigma_x2, sigma_ux2, charge = list(), list(), list(), list()
+        emit, sigma_x2, sigma_ux2, es, charge = list(), list(), list(), list(), list()
         z = c*self.t*1.e6  # in microns
 
-        if zeta_coord and 'z' in select:
+        if zeta_coord and ('z' in select):
             if time != 0.:
                 time = time
             else:
                 time = self.t[0]
             for k,i in enumerate(self.iterations):
                 v_w = self.params['v_window']
-                select['z'] = [select['z'][0]+v_w*(self.t[k]-time),select['z'][1]+v_w*(self.t[k]-time)]
-                x, ux, w = self.ts.get_particle(['x', 'ux', 'w'], iteration=i, select=select, species=species)
+                selection = select.copy()
+                selection['z'] = [select['z'][0]+(v_w*(self.t[k]-time))*1e6,select['z'][1]+(v_w*(self.t[k]-time))*1e6]
+                x, ux, gamma, w = self.ts.get_particle(['x', 'ux', 'gamma', 'w'], iteration=i, select=selection, species=species)
                 l, m, n = self.emittance_t(x, ux, w)
+                o = self.energy_spread(gamma, w)
                 emit.append(l)
                 sigma_x2.append(m)
                 sigma_ux2.append(n)
+                es.append(o)
                 charge.append(w.sum()*e/ptcl_percent)
         else:
             for i in self.iterations:
-                x, ux, w = self.ts.get_particle(['x', 'ux', 'w'], iteration=i, select=select, species=species)
+                x, ux, gamma, w = self.ts.get_particle(['x', 'ux', 'gamma', 'w'], iteration=i, select=select, species=species)
                 l, m, n = self.emittance_t(x, ux, w)
+                o = self.energy_spread(gamma,w)
                 emit.append(l)
                 sigma_x2.append(m)
                 sigma_ux2.append(n)
+                es.append(o)
                 charge.append(w.sum()*e/ptcl_percent)
 
-        fig, ax = plt.subplots(2, 2, figsize=(10, 10))
+        fig, ax = plt.subplots(2, 3, figsize=(10, 10))
 
         ax[0, 0].plot(z, emit, **kwargs)
-        ax[0, 0].xlim(left=z.min())
+        ax[0, 0].set_xlim(left=z.min())
         ax[0, 0].set_title('emit')
 
         ax[0, 1].plot(z, sigma_x2, **kwargs)
-        ax[0, 1].xlim(left=z.min())
+        ax[0, 1].set_xlim(left=z.min())
         ax[0, 1].set_title('beam size')
 
-        ax[1, 0].plot(z, sigma_ux2, **kwargs)
-        ax[1, 0].xlim(left=z.min())
-        ax[1, 0].set_title('momenta spread')
+        ax[0, 2].plot(z, sigma_ux2, **kwargs)
+        ax[0, 2].set_xlim(left=z.min())
+        ax[0, 2].set_title('momenta spread')
+
+        ax[1,0].plot(z, es, **kwargs)
+        ax[1,0].set_xlim(left=z.min())
+        ax[1,0].set_title('energy spread')
 
         ax[1, 1].plot(z, charge, **kwargs)
         ax[1, 1].set_title('charge')
 
+        ax[1,2].remove()
         plt.tight_layout()
 
         if output:
             emit = np.array(emit)
             sigma_x2 = np.array(sigma_x2)
             sigma_ux2 = np.array(sigma_ux2)
+            es = np.array(es)
             charge = np.array(charge)
 
-            prop = {'emit': emit, 'sigma_x2': sigma_x2,
-                    'sigma_ux2': sigma_ux2, 'charge': charge}
+            prop = {'emittance': emit, 'sigma_x2': sigma_x2,
+                    'sigma_ux2': sigma_ux2, 'energy_spread': es, 'charge': charge}
             return prop, fig, ax
         else:
             return fig, ax
@@ -399,7 +463,9 @@ class Diag(object):
             q = e
         gamma, w = self.ts.get_particle(['gamma', 'w'], iteration=iteration,
                                         species=species, select=select)
+        es = self.energy_spread(gamma,w)
         plt.hist(a*gamma,weights=q*in_ptcl_percent*w, **kwargs)  # needed values output as self.values? I'll see
+        print('Energy spread is {:3.1f}%'.format(es*100))
 
     def phase_space_hist(self, species, iteration, component1='z', component2='uz', select=None, zeta_coord=False, **kwargs):
         """
