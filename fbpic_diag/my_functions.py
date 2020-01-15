@@ -219,7 +219,7 @@ class Diag(object):
         return phi, info_e
 
     def lineout(self, field_name, iteration,
-                coord=None, theta=0, m='all', normalize=False, N=None, zeta_coord=False, **kwargs):
+                coord=None, theta=0, m='all', normalize=False, A0=None, slicing='z', on_axis=None, zeta_coord=False, **kwargs):
         """
         Method to get a lineout plot of passed field_name
 
@@ -234,37 +234,50 @@ class Diag(object):
             normalize: bool, optional
                     If normalize=True this 'turns on' the normalization.
                     Default is 'False'.
-            N: float, optional
+            A0: float, optional
                     If normalize=True this allows to set the normilizing costant.
                     Default is 'None: in this case normalization is set to
                     usual units, e.g:
                     - e*n_e for charge density 'rho'; this returns normalized density
                     - m_e*c*omega_0/e for transverse 'E'
                     - m_e*c*omega_p/e for longitudinal 'E'
+            slicing: str, optional
+                    This sets the slicing along the chosen direction ('z' or 'r').
+                    Default is 'z'.
+            on_axis: float, in microns
+                    Coord in microns of slicing line along the chosen direction.
+                    Default is 'r' = '0.' or 'z' = mid of the z-axis
             zeta_coord: bool, optional
                     If 'True' transforms z coords into z-v_w*t coords;
                     v_w is moving window velocity. Dafault is 'False'
             **kwargs: keywords to pass to .pyplot.plot() function
 
         """
-        Nr = self.params['Nr']
-
         if field_name == 'phi':
             E, info_e = self.potential(iteration,theta=theta,m=m)
         else:
             E, info_e = self.ts.get_field(field=field_name, coord=coord,
                                           iteration=iteration, theta=theta, m=m)
-            E = E[Nr,:]
+        if slicing == 'z':
+            if on_axis == None:
+                on_axis = 0.
+            N = self.params['Nr'] + int(on_axis*1.e-6/info_e.dr)
+            E = E[N,:]
+            z = info_e.z*1.e6
+            if zeta_coord:
+                v_w = self.params['v_window']
+                t = self.ts.current_t
+                z = (info_e.z-v_w*t)*1.e6
+        else:
+            if on_axis == None:
+                on_axis = info_e.z[self.params['Nz']]*1.e6
+            N = self.params['Nz']+int((on_axis*1.e-6-info_e.z[self.params['Nz']])/info_e.dz)
+            E = E[:,N]
+            z = info_e.r*1.e6
         E0 = 1
 
         if normalize:
-            E0 = self.__normalize__(field_name, coord, N)
-        z = info_e.z*1.e6
-
-        if zeta_coord:
-            v_w = self.params['v_window']
-            t = self.ts.current_t
-            z = (info_e.z-v_w*t)*1.e6
+            E0 = self.__normalize__(field_name, coord, A0)
 
         plt.plot(z, E/E0, **kwargs)
 
