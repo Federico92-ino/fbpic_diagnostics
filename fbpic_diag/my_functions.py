@@ -212,13 +212,10 @@ class Diag(object):
         """
         Ez, info_e = self.ts.get_field('E', coord='z', iteration=iteration, theta=theta, m=m)
         Nr=self.params['Nr']
-        phi = list(np.zeros_like(Ez[Nr,:]))
+        phi = np.zeros_like(Ez[Nr,:])
         max = Ez.shape[1]
-        phi.append(phi_max)
-        for i in range(max):
-            phi[(max-1)-i] = np.trapz(Ez[Nr,max-i-1:max-i+1],dx=info_e.dz) + phi[max-i]
-        phi.pop()
-        phi = np.array(phi)
+        for i in range(max-2,-1,-1):
+            phi[i] = np.trapz(Ez[Nr,i:i+2],dx=info_e.dz) + phi[i+1]
         return phi, info_e
 
     def lineout(self, field_name, iteration,
