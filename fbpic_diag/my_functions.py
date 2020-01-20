@@ -197,7 +197,7 @@ class Diag(object):
 
         return np.sqrt(sigma2)
 
-    def potential(self, iteration, theta=0, m='all', phi_max = 0.):
+    def potential(self, iteration, theta=0, m='all'):
         """
         Method to integrate electrostatic potential from longitudinal field Ez.
 
@@ -207,15 +207,12 @@ class Diag(object):
             theta, m:
                 Same parameters of .get_field() method.
                 Same defaults (0, 'all')
-            phi_max: float
-                The boundary value of potential at the right edge of the box
         """
         Ez, info_e = self.ts.get_field('E', coord='z', iteration=iteration, theta=theta, m=m)
-        Nr=self.params['Nr']
-        phi = np.zeros_like(Ez[Nr,:])
+        phi = np.zeros_like(Ez)
         max = Ez.shape[1]
         for i in range(max-2,-1,-1):
-            phi[i] = np.trapz(Ez[Nr,i:i+2],dx=info_e.dz) + phi[i+1]
+            phi[:,i] = np.trapz(Ez[:,i:i+2],dx=info_e.dz) + phi[:,i+1]
         return phi, info_e
 
     def lineout(self, field_name, iteration,
@@ -270,8 +267,8 @@ class Diag(object):
                 z = (info_e.z-v_w*t)*1.e6
         else:
             if on_axis == None:
-                on_axis = info_e.z[self.params['Nz']]*1.e6
-            N = self.params['Nz']+int((on_axis*1.e-6-info_e.z[self.params['Nz']])/info_e.dz)
+                on_axis = info_e.z[int(self.params['Nz']/2)]*1.e6
+            N = int(self.params['Nz']/2) + int((on_axis*1.e-6-info_e.z[int(self.params['Nz']/2)])/info_e.dz)
             E = E[:,N]
             z = info_e.r*1.e6
         E0 = 1
@@ -310,8 +307,11 @@ class Diag(object):
             ax: a matplotlib.axes.Axes instance
 
         """
-        E, info_e = self.ts.get_field(field=field_name, coord=coord,
-                                      iteration=iteration, theta=theta, m=m)
+        if field_name == 'phi':
+            E, info_e = self.potential(iteration,theta=theta,m=m)
+        else:
+            E, info_e = self.ts.get_field(field=field_name, coord=coord,
+                                          iteration=iteration, theta=theta, m=m)
 
         E0 = 1
         if normalize:
