@@ -7,7 +7,88 @@ import numpy as np
 import matplotlib.pyplot as plt
 from opmd_viewer import OpenPMDTimeSeries
 import json
-from scipy.constants import e, m_e, c, pi, epsilon_0
+from scipy.constants import e, m_e, c
+
+
+def divergence(px=None, py=None, pz=None):
+    """
+    Function that computes the bunch divergence,
+    either along a planar slice (div = px/pz) or the
+    total divergence as sqrt((px**2+py**2)/pz**2)
+
+    Parameters
+    --------
+    px: np.array
+        Transverse momentum along the first direction
+    py: np.array
+        Transverse momentum along the second direction.
+        If None it distinguish between the planar divergence and
+        the solid one
+    pz: np.array
+        Longitudinal momentum
+
+    Returns
+    --------
+    div: np.array
+        Divergence
+    """
+    if py is not None:
+        div = np.sqrt((px**2+py**2)/pz**2)
+    else:
+        div = px/pz
+
+    return div
+
+
+def emittance_l(x, ux, w):
+    """
+    Function to calculate bunches' normalized longitudinal emittance;
+    the result is given in mm*mrad.
+    **Parameters**
+    x, ux: two 1darrays of  phase-space coords
+    w: ndarray of particles' weights
+    **Returns**
+    emittance, beam size and momenta spread
+    """
+    x_mean = np.ma.average(x, weights=w)
+    ux_mean = np.ma.average(ux, weights=w)
+    sigma_x2 = np.ma.average((x-x_mean)**2, weights=w)
+    sigma_ux2 = np.ma.average((ux-ux_mean)**2, weights=w)
+    sigma_xux2 = (np.ma.average((x-x_mean)*(ux-ux_mean), weights=w))**2
+    emit = np.sqrt(sigma_x2*sigma_ux2-sigma_xux2)
+    return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
+
+
+def emittance_t(x, ux, w):
+    """
+    Function to calculate bunches'normalized transverse emittance;
+    the result is given in mm*mrad.
+    **Parameters**
+    x, ux: two ndarrays of  phase-space coords
+    w: ndarray of particles' weights
+    **Returns**
+    emittance, beam size, momenta spread
+    """
+    sigma_x2 = np.ma.average(x**2, weights=w)
+    sigma_ux2 = np.ma.average(ux**2, weights=w)
+    sigma_xux = np.ma.average(x*ux, weights=w)
+    emit = np.sqrt(sigma_x2*sigma_ux2 - sigma_xux**2)
+    return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
+
+
+def energy_spread(gamma, w):
+    """
+    Function to calculate energy spread of bunch's energy spectra
+    **Parameters**
+        gamma: float, array
+            An array of normalized energy values
+        w: float, array
+            An array of weights
+    """
+    mean = np.ma.average(gamma, weights=w)
+    mean2 = np.ma.average(gamma**2, weights=w)
+    sigma2 = (mean2 - mean**2)/mean**2
+    return np.sqrt(sigma2)
 
 
 class Diag(object):
@@ -24,7 +105,7 @@ class Diag(object):
         self.avail_geom = self.ts.avail_geom
         self.avail_species = self.ts.avail_species
         self.avail_record_components = self.ts.avail_record_components
-    
+
     def __normalize__(self, field_name, coord, N):
         if N is None:
             n_e = self.params['n_e']
@@ -64,56 +145,6 @@ class Diag(object):
             dictionary[key] = self.ts.get_particle([key], **kwargs)[0]
         return dictionary
 
-    def emittance_l(self, x, ux, w):
-
-        """
-        Function to calculate bunches'normalized longitudinal emittance;
-        the result is given in mm*mrad.
-
-        **Parameters**
-
-            x, ux: two 1darrays of  phase-space coords
-            w: ndarray of particles' weights
-
-        **Returns**
-
-            emittance, beam size and momenta spread
-
-        """
-
-        x_mean = np.ma.average(x, weights=w)
-        ux_mean = np.ma.average(ux, weights=w)
-        sigma_x2 = np.ma.average((x-x_mean)**2, weights=w)
-        sigma_ux2 = np.ma.average((ux-ux_mean)**2, weights=w)
-        sigma_xux2 = (np.ma.average((x-x_mean)*(ux-ux_mean), weights=w))**2
-
-        emit = np.sqrt(sigma_x2*sigma_ux2-sigma_xux2)
-        return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
-
-    def emittance_t(self, x, ux, w):
-
-        """
-        Function to calculate bunches'normalized transverse emittance;
-        the result is given in mm*mrad.
-
-        **Parameters**
-
-            x, ux: two ndarrays of  phase-space coords
-            w: ndarray of particles' weights
-
-        **Returns**
-
-            emittance, beam size, momenta spread
-
-        """
-
-        sigma_x2 = np.ma.average(x**2, weights=w)
-        sigma_ux2 = np.ma.average(ux**2, weights=w)
-        sigma_xux = np.ma.average(x*ux, weights=w)
-
-        emit = np.sqrt(sigma_x2*sigma_ux2 - sigma_xux**2)
-        return emit, np.sqrt(sigma_x2), np.sqrt(sigma_ux2)
-
     def slice_emit(self, N, **kwargs):
         """
         Function to calculate slice emittances of a 'N sliced' bunch
@@ -137,9 +168,10 @@ class Diag(object):
         """
         if 'var_list' in kwargs:
             raise Exception("You don't need to pass 'var_list' argument!\n \
-                             Try again with just the others kwargs of .get_particle()" )
+                             Try again with just the others kwargs\
+                             of .get_particle()")
 
-        dictionary = self.read_properties(['x','ux','z','w'],**kwargs)
+        dictionary = self.read_properties(['x', 'ux', 'z', 'w'], **kwargs)
         dz = (dictionary['z'].max()-dictionary['z'].min())/N
 
         s_emit = list()
@@ -163,7 +195,7 @@ class Diag(object):
 
             Z.append(z[inds].mean())
 
-            s_prop = self.emittance_t(x[inds], ux[inds], w[inds])
+            s_prop = emittance_t(x[inds], ux[inds], w[inds])
             s_emit.append(s_prop[0])
             s_sigma_x2.append(s_prop[1])
             s_sigma_ux2.append(s_prop[2])
@@ -181,23 +213,8 @@ class Diag(object):
         Ph_space = {'x': X, 'ux': UX, 'z': ZZ}
 
         return S_prop, Ph_space, dz
-    
-    def energy_spread(self, gamma, w):
-        """
-        Function to calculate energy spread of bunch's energy spectra
-        **Parameters**
-            gamma: float, array
-                An array of normalized energy values 
-            w: float, array
-                An array of weights
-        """
-        mean = np.ma.average(gamma,weights=w)
-        mean2 = np.ma.average(gamma**2,weights=w)
-        sigma2 = (mean2 - mean**2)/mean**2
 
-        return np.sqrt(sigma2)
-
-    def potential(self, iteration, theta=0, m='all', phi_max = 0.):
+    def potential(self, iteration, theta=0, m='all', phi_max=0.):
         """
         Method to integrate electrostatic potential from longitudinal field Ez.
 
@@ -210,19 +227,23 @@ class Diag(object):
             phi_max: float
                 The boundary value of potential at the right edge of the box
         """
-        Ez, info_e = self.ts.get_field('E', coord='z', iteration=iteration, theta=theta, m=m)
-        Nr=self.params['Nr']
-        phi = list(np.zeros_like(Ez[Nr,:]))
+
+        Ez, info_e = self.ts.get_field('E', coord='z', iteration=iteration,
+                                       theta=theta, m=m)
+        Nr = self.params['Nr']
+        phi = list(np.zeros_like(Ez[Nr, :]))
         max = Ez.shape[1]
         phi.append(phi_max)
         for i in range(max):
-            phi[(max-1)-i] = np.trapz(Ez[Nr,max-i-1:max-i+1],dx=info_e.dz) + phi[max-i]
+            phi[(max-1)-i] = np.trapz(Ez[Nr, max-i-1:max-i+1], dx=info_e.dz)\
+                             + phi[max-i]
         phi.pop()
         phi = np.array(phi)
         return phi, info_e
 
-    def lineout(self, field_name, iteration,
-                coord=None, theta=0, m='all', normalize=False, N=None, zeta_coord=False, **kwargs):
+    def lineout(self, field_name, iteration, coord=None, theta=0,
+                m='all', normalize=False, N=None, zeta_coord=False,
+                **kwargs):
         """
         Method to get a lineout plot of passed field_name
 
@@ -238,26 +259,29 @@ class Diag(object):
                     If normalize=True this 'turns on' the normalization.
                     Default is 'False'.
             N: float, optional
-                    If normalize=True this allows to set the normilizing costant.
-                    Default is 'None: in this case normalization is set to
-                    usual units, e.g:
-                    - e*n_e for charge density 'rho'; this returns normalized density
+                    If normalize=True this allows to set the
+                    normalizing costant.
+                    Default is 'None: in this case normalization
+                    is set to usual units, e.g:
+                    - e*n_e for charge density 'rho';
+                      this returns normalized density
                     - m_e*c*omega_0/e for transverse 'E'
                     - m_e*c*omega_p/e for longitudinal 'E'
             zeta_coord: bool, optional
                     If 'True' transforms z coords into z-v_w*t coords;
-                    v_w is moving window velocity. Dafault is 'False'
+                    v_w is moving window velocity. Default is 'False'
             **kwargs: keywords to pass to .pyplot.plot() function
 
         """
         Nr = self.params['Nr']
 
         if field_name == 'phi':
-            E, info_e = self.potential(iteration,theta=theta,m=m)
+            E, info_e = self.potential(iteration, theta=theta, m=m)
         else:
             E, info_e = self.ts.get_field(field=field_name, coord=coord,
-                                          iteration=iteration, theta=theta, m=m)
-            E = E[Nr,:]
+                                          iteration=iteration, theta=theta,
+                                          m=m)
+            E = E[Nr, :]
         E0 = 1
 
         if normalize:
@@ -288,10 +312,12 @@ class Diag(object):
                     If normalize=True this 'turns on' the normalization.
                     Default is 'False'.
             N: float, optional;
-                    If normalize=True this allows to set the normilizing costant.
+                    If normalize=True this allows to set the normalizing
+                    constant.
                     Default is 'None: in this case normalization is set to
                     usual units, e.g:
-                    - e*n_e for charge density 'rho'; this returns normalized density
+                    - e*n_e for charge density 'rho'; this returns normalized
+                      density
                     - m_e*c*omega_0/e for transverse 'E'
                     - m_e*c*omega_p/e for longitudinal 'E'
             **kwargs: keywords to pass to .Axes.imshow() method
@@ -312,13 +338,15 @@ class Diag(object):
         if 'origin' in kwargs:
             origin = kwargs['origin']
             del kwargs['origin']
-        ax.imshow(E/E0, extent=info_e.imshow_extent*1.e6, origin=origin, **kwargs)
+        ax.imshow(E/E0, extent=info_e.imshow_extent*1.e6,
+                  origin=origin, **kwargs)
         fig.colorbar(ax.get_images()[0], ax=ax, use_gridspec=True)
 
         return fig, ax
 
-    def bunch_properties_evolution(self, select, species='electrons', 
-                                   output=False, zeta_coord=False, time=0., **kwargs):
+    def bunch_properties_evolution(self, select, species='electrons',
+                                   output=False, zeta_coord=False, time=0.,
+                                   **kwargs):
         """
         Method to select a bunch and to plot the evolution of
         its characteristics along propagation length
@@ -338,28 +366,34 @@ class Diag(object):
               selection is made in co-moving frame
             species: string
                 A string indicating the name of the species
-                This is optional if there is only one species; default is 'electrons'.
+                This is optional if there is only one species;
+                default is 'electrons'.
             output: bool
-                If 'True' returns a dict of five np.arrays wich
+                If 'True' returns a dict of five np.arrays which
                 contains bunch_properties values.
             zeta_coord: bool
                 If 'True' the 'z' selection is done in co-moving frame
             time: float
                 Specify the time (s) at which refers the 'z' selection.
-                Default is the first itertion, i.e. time = 0.0 s
+                Default is the first iteration, i.e. time = 0.0 s
             **kwargs: keyword to pass to .pyplot.plot()
 
         **Returns**
 
             prop: dictionary, if 'output' is 'True'
-                A dict of bunch's properties values: emittance, beam size, 
+                  A dict of bunch's properties values:
+                  emittance, beam size,
                 momenta spread, energy spread and beam charge
             fig, ax: Figure, Axes
                 To handle the plot output
 
         """
         ptcl_percent = self.params['subsampling_fraction']
-        emit, sigma_x2, sigma_ux2, es, charge = list(), list(), list(), list(), list()
+        emit = list()
+        sigma_x2 = list()
+        sigma_ux2 = list()
+        es = list()
+        charge = list()
         z = c*self.t*1.e6  # in microns
 
         if zeta_coord and ('z' in select):
@@ -367,13 +401,17 @@ class Diag(object):
                 time = time
             else:
                 time = self.t[0]
-            for k,i in enumerate(self.iterations):
+            for k, i in enumerate(self.iterations):
                 v_w = self.params['v_window']
                 selection = select.copy()
-                selection['z'] = [select['z'][0]+(v_w*(self.t[k]-time))*1e6,select['z'][1]+(v_w*(self.t[k]-time))*1e6]
-                x, ux, gamma, w = self.ts.get_particle(['x', 'ux', 'gamma', 'w'], iteration=i, select=selection, species=species)
-                l, m, n = self.emittance_t(x, ux, w)
-                o = self.energy_spread(gamma, w)
+                selection['z'] = [select['z'][0]+(v_w*(self.t[k]-time))*1e6,
+                                  select['z'][1]+(v_w*(self.t[k]-time))*1e6]
+                x, ux, gamma, w = \
+                    self.ts.get_particle(['x', 'ux', 'gamma', 'w'],
+                                         iteration=i, select=selection,
+                                         species=species)
+                l, m, n = emittance_t(x, ux, w)
+                o = energy_spread(gamma, w)
                 emit.append(l)
                 sigma_x2.append(m)
                 sigma_ux2.append(n)
@@ -381,9 +419,12 @@ class Diag(object):
                 charge.append(w.sum()*e/ptcl_percent)
         else:
             for i in self.iterations:
-                x, ux, gamma, w = self.ts.get_particle(['x', 'ux', 'gamma', 'w'], iteration=i, select=select, species=species)
-                l, m, n = self.emittance_t(x, ux, w)
-                o = self.energy_spread(gamma,w)
+                x, ux, gamma, w = \
+                    self.ts.get_particle(['x', 'ux', 'gamma', 'w'],
+                                         iteration=i, select=select,
+                                         species=species)
+                l, m, n = emittance_t(x, ux, w)
+                o = energy_spread(gamma, w)
                 emit.append(l)
                 sigma_x2.append(m)
                 sigma_ux2.append(n)
@@ -404,14 +445,14 @@ class Diag(object):
         ax[0, 2].set_xlim(left=z.min())
         ax[0, 2].set_title('momenta spread')
 
-        ax[1,0].plot(z, es, **kwargs)
-        ax[1,0].set_xlim(left=z.min())
-        ax[1,0].set_title('energy spread')
+        ax[1, 0].plot(z, es, **kwargs)
+        ax[1, 0].set_xlim(left=z.min())
+        ax[1, 0].set_title('energy spread')
 
         ax[1, 1].plot(z, charge, **kwargs)
         ax[1, 1].set_title('charge')
 
-        ax[1,2].remove()
+        ax[1, 2].remove()
         plt.tight_layout()
 
         if output:
@@ -422,12 +463,14 @@ class Diag(object):
             charge = np.array(charge)
 
             prop = {'emittance': emit, 'sigma_x2': sigma_x2,
-                    'sigma_ux2': sigma_ux2, 'energy_spread': es, 'charge': charge}
+                    'sigma_ux2': sigma_ux2, 'energy_spread': es,
+                    'charge': charge}
             return prop, fig, ax
         else:
             return fig, ax
 
-    def spectrum(self, iteration, select=None, species='electrons', energy=False, charge=False, **kwargs):
+    def spectrum(self, iteration, select=None, species='electrons',
+                 energy=False, charge=False, **kwargs):
         """
         Method to easily get an energy spectrum of 'selected' particles
 
@@ -435,17 +478,17 @@ class Diag(object):
 
             iteration: int
                 Which iteration we need
-            select: dictionary or ParticleTracker istance
+            select: dictionary or ParticleTracker instance
                 Particle selector
             species: str, optional
                 Default is 'electrons'
             energy: bool, optional
                 If 'True' this sets the x-axis on energy(MeV),
-                otherwise x-axis has adimensional gamma values.
+                otherwise x-axis has dimensionless gamma values.
                 Default is 'False'.
             charge: bool, optional
                 If True this sets the y-axis on dQ/dE values,
-                multipling the weights for electron charge.
+                multiplying the weights for electron charge.
                 Default is False, that means setting y-axis on dN/dE values
             **kwargs: keyword to pass to .hist() method
 
@@ -463,11 +506,14 @@ class Diag(object):
             q = e
         gamma, w = self.ts.get_particle(['gamma', 'w'], iteration=iteration,
                                         species=species, select=select)
-        es = self.energy_spread(gamma,w)
-        plt.hist(a*gamma,weights=q*in_ptcl_percent*w, **kwargs)  # needed values output as self.values? I'll see
+        es = energy_spread(gamma, w)
+        # needed values output as self.values? I'll see
+        plt.hist(a*gamma, weights=q*in_ptcl_percent*w, **kwargs)
         print('Energy spread is {:3.1f}%'.format(es*100))
 
-    def phase_space_hist(self, species, iteration, component1='z', component2='uz', select=None, zeta_coord=False, **kwargs):
+    def phase_space_hist(self, species, iteration, component1='z',
+                         component2='uz', select=None, zeta_coord=False,
+                         **kwargs):
         """
         Method that plots a 2D histogram of the particles phase space.
 
@@ -510,8 +556,10 @@ class Diag(object):
             alpha = kwargs['alpha']
             del kwargs['alpha']
 
-        comp1, comp2, weight = self.ts.get_particle([component1, component2, 'w'],
-                                                    iteration=iteration, select=select, species=species)
+        comp1, comp2, weight = \
+            self.ts.get_particle([component1, component2, 'w'],
+                                 iteration=iteration, select=select,
+                                 species=species)
 
         if component1 == 'z' and zeta_coord:
             t = self.ts.current_t
@@ -521,8 +569,10 @@ class Diag(object):
             t = self.ts.current_t
             comp2 -= c*t*1.e6
 
-        H, xedge, yedge = np.histogram2d(comp1, comp2,
-                                         bins=bins, weights=weight, density=density)
+        H, xedge, yedge = \
+            np.histogram2d(comp1, comp2,
+                           bins=bins, weights=weight,
+                           density=density)
         H = H.T
         X, Y = np.meshgrid(xedge, yedge)
         H = np.ma.masked_where(H == 0, H)
