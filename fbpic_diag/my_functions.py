@@ -214,7 +214,7 @@ class Diag(object):
 
         return S_prop, Ph_space, dz
 
-    def potential(self, iteration, theta=0, m='all', phi_max=0.):
+    def potential(self, iteration, theta=0, m='all'):
         """
         Method to integrate electrostatic potential from longitudinal field Ez.
 
@@ -224,26 +224,16 @@ class Diag(object):
             theta, m:
                 Same parameters of .get_field() method.
                 Same defaults (0, 'all')
-            phi_max: float
-                The boundary value of potential at the right edge of the box
         """
-
-        Ez, info_e = self.ts.get_field('E', coord='z', iteration=iteration,
-                                       theta=theta, m=m)
-        Nr = self.params['Nr']
-        phi = list(np.zeros_like(Ez[Nr, :]))
+        Ez, info_e = self.ts.get_field('E', coord='z', iteration=iteration, theta=theta, m=m)
+        phi = np.zeros_like(Ez)
         max = Ez.shape[1]
-        phi.append(phi_max)
-        for i in range(max):
-            phi[(max-1)-i] = np.trapz(Ez[Nr, max-i-1:max-i+1], dx=info_e.dz)\
-                             + phi[max-i]
-        phi.pop()
-        phi = np.array(phi)
+        for i in range(max-2,-1,-1):
+            phi[:,i] = np.trapz(Ez[:,i:i+2],dx=info_e.dz) + phi[:,i+1]
         return phi, info_e
 
-    def lineout(self, field_name, iteration, coord=None, theta=0,
-                m='all', normalize=False, N=None, zeta_coord=False,
-                **kwargs):
+    def lineout(self, field_name, iteration,
+                coord=None, theta=0, m='all', normalize=False, A0=None, slicing='z', on_axis=None, zeta_coord=False, **kwargs):
         """
         Method to get a lineout plot of passed field_name
 
@@ -258,40 +248,50 @@ class Diag(object):
             normalize: bool, optional
                     If normalize=True this 'turns on' the normalization.
                     Default is 'False'.
-            N: float, optional
-                    If normalize=True this allows to set the
-                    normalizing costant.
-                    Default is 'None: in this case normalization
-                    is set to usual units, e.g:
-                    - e*n_e for charge density 'rho';
-                      this returns normalized density
+            A0: float, optional
+                    If normalize=True this allows to set the normilizing costant.
+                    Default is 'None: in this case normalization is set to
+                    usual units, e.g:
+                    - e*n_e for charge density 'rho'; this returns normalized density
                     - m_e*c*omega_0/e for transverse 'E'
                     - m_e*c*omega_p/e for longitudinal 'E'
+            slicing: str, optional
+                    This sets the slicing along the chosen direction ('z' or 'r').
+                    Default is 'z'.
+            on_axis: float, in microns
+                    Coord in microns of slicing line along the chosen direction.
+                    Default is 'r' = '0.' or 'z' = mid of the z-axis
             zeta_coord: bool, optional
                     If 'True' transforms z coords into z-v_w*t coords;
                     v_w is moving window velocity. Default is 'False'
             **kwargs: keywords to pass to .pyplot.plot() function
 
         """
-        Nr = self.params['Nr']
-
         if field_name == 'phi':
             E, info_e = self.potential(iteration, theta=theta, m=m)
         else:
             E, info_e = self.ts.get_field(field=field_name, coord=coord,
-                                          iteration=iteration, theta=theta,
-                                          m=m)
-            E = E[Nr, :]
+                                          iteration=iteration, theta=theta, m=m)
+        if slicing == 'z':
+            if on_axis == None:
+                on_axis = 0.
+            N = self.params['Nr'] + int(on_axis*1.e-6/info_e.dr)
+            E = E[N,:]
+            z = info_e.z*1.e6
+            if zeta_coord:
+                v_w = self.params['v_window']
+                t = self.ts.current_t
+                z = (info_e.z-v_w*t)*1.e6
+        else:
+            if on_axis == None:
+                on_axis = info_e.z[int(self.params['Nz']/2)]*1.e6
+            N = int(self.params['Nz']/2) + int((on_axis*1.e-6-info_e.z[int(self.params['Nz']/2)])/info_e.dz)
+            E = E[:,N]
+            z = info_e.r*1.e6
         E0 = 1
 
         if normalize:
-            E0 = self.__normalize__(field_name, coord, N)
-        z = info_e.z*1.e6
-
-        if zeta_coord:
-            v_w = self.params['v_window']
-            t = self.ts.current_t
-            z = (info_e.z-v_w*t)*1.e6
+            E0 = self.__normalize__(field_name, coord, A0)
 
         plt.plot(z, E/E0, **kwargs)
 
@@ -326,8 +326,11 @@ class Diag(object):
             ax: a matplotlib.axes.Axes instance
 
         """
-        E, info_e = self.ts.get_field(field=field_name, coord=coord,
-                                      iteration=iteration, theta=theta, m=m)
+        if field_name == 'phi':
+            E, info_e = self.potential(iteration,theta=theta,m=m)
+        else:
+            E, info_e = self.ts.get_field(field=field_name, coord=coord,
+                                          iteration=iteration, theta=theta, m=m)
 
         E0 = 1
         if normalize:
