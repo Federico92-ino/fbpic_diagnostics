@@ -11,6 +11,7 @@ from scipy.constants import e, m_e, c
 
 
 def divergence(px=None, py=None, pz=None):
+
     """
     Function that computes the bunch divergence,
     either along a planar slice (div = px/pz) or the
@@ -92,6 +93,7 @@ def energy_spread(gamma, w):
 
 
 class Diag(object):
+
     """
     A class to handle diagnostics of a plasma simulation;
     pass the path of hd5f files
@@ -125,6 +127,8 @@ class Diag(object):
                 N = m_e*omega0/e
             elif field_name == 'phi':
                 N = m_e*c**2/e
+            elif field_name == 'force':
+                N = m_e*omega0*c
         return N
 
     def read_properties(self, var_list, **kwargs):
@@ -228,12 +232,43 @@ class Diag(object):
         Ez, info_e = self.ts.get_field('E', coord='z', iteration=iteration, theta=theta, m=m)
         phi = np.zeros_like(Ez)
         max = Ez.shape[1]
-        for i in range(max-2,-1,-1):
-            phi[:,i] = np.trapz(Ez[:,i:i+2],dx=info_e.dz) + phi[:,i+1]
+        for i in range(max-2, -1, -1):
+            phi[:, i] = np.trapz(Ez[:, i:i+2], dx=info_e.dz) + phi[:, i+1]
         return phi, info_e
 
+    def force(self, coord, iteration, theta=0, m='all'):
+        """
+        Method to calculate transverse components of force .
+
+        **Parameters**
+            coord: str
+                Which component 'x' or 'y'
+            iteration: int
+                The same as usual
+            theta, m:
+                Same parameters of .get_field() method.
+                Same defaults (0, 'all')
+        """
+
+        if coord == 'x':
+            E, info_e = self.ts.get_field('E', 'x', iteration=iteration, m=m, theta=theta)
+            B, info_b = self.ts.get_field('B', 'y', iteration=iteration, m=m, theta=theta)
+            del info_b
+            F = e*(E - c*B)
+        elif coord == 'y':
+            E, info_e = self.ts.get_field('E', 'y', iteration=iteration, m=m, theta=theta)
+            B, info_b = self.ts.get_field('B', 'x', iteration=iteration, m=m, theta=theta)
+            del info_b
+            F = e*(E + c*B)
+        else:
+            raise ValueError("You must specify a force component in \n"
+                             "\t\a x' or 'y' direction for 'coord'")
+        return F, info_e
+
     def lineout(self, field_name, iteration,
-                coord=None, theta=0, m='all', normalize=False, A0=None, slicing='z', on_axis=None, zeta_coord=False, **kwargs):
+                coord=None, theta=0, m='all',
+                normalize=False, A0=None, slicing='z',
+                on_axis=None, zeta_coord=False, **kwargs):
         """
         Method to get a lineout plot of passed field_name
 
@@ -269,6 +304,8 @@ class Diag(object):
         """
         if field_name == 'phi':
             E, info_e = self.potential(iteration, theta=theta, m=m)
+        elif field_name == 'force':
+            E, info_e = self.force(coord, iteration, theta, m)
         else:
             E, info_e = self.ts.get_field(field=field_name, coord=coord,
                                           iteration=iteration, theta=theta, m=m)
@@ -276,7 +313,7 @@ class Diag(object):
             if on_axis == None:
                 on_axis = 0.
             N = self.params['Nr'] + int(on_axis*1.e-6/info_e.dr)
-            E = E[N,:]
+            E = E[N, :]
             z = info_e.z*1.e6
             if zeta_coord:
                 v_w = self.params['v_window']
@@ -286,7 +323,7 @@ class Diag(object):
             if on_axis == None:
                 on_axis = info_e.z[int(self.params['Nz']/2)]*1.e6
             N = int(self.params['Nz']/2) + int((on_axis*1.e-6-info_e.z[int(self.params['Nz']/2)])/info_e.dz)
-            E = E[:,N]
+            E = E[:, N]
             z = info_e.r*1.e6
         E0 = 1
 
@@ -327,7 +364,9 @@ class Diag(object):
 
         """
         if field_name == 'phi':
-            E, info_e = self.potential(iteration,theta=theta,m=m)
+            E, info_e = self.potential(iteration, theta=theta, m=m)
+        elif field_name == 'force':
+            E, info_e = self.force(coord, iteration, theta, m)
         else:
             E, info_e = self.ts.get_field(field=field_name, coord=coord,
                                           iteration=iteration, theta=theta, m=m)
@@ -493,7 +532,9 @@ class Diag(object):
                 If True this sets the y-axis on dQ/dE values,
                 multiplying the weights for electron charge.
                 Default is False, that means setting y-axis on dN/dE values
-            **kwargs: keyword to pass to .hist() method
+            **kwargs: keyword to pass to .hist() method; in kwargs you can also
+                    set the position of text inset in 'figure' frame [(0.,1.),(0.,1.)].
+                    Default is [0.7,0.7].
 
         **Returns**
 
@@ -510,13 +551,25 @@ class Diag(object):
         gamma, w = self.ts.get_particle(['gamma', 'w'], iteration=iteration,
                                         species=species, select=select)
         es = energy_spread(gamma, w)
-        # needed values output as self.values? I'll see
+        tot_charge = w.sum()*q*in_ptcl_percent
+
+        pos = [0.7, 0.7]
+        if 'text_pos' in kwargs:
+            pos = kwargs['text_pos']
+            del kwargs['text_pos']
+
         plt.hist(a*gamma, weights=q*in_ptcl_percent*w, **kwargs)
-        print('Energy spread is {:3.1f}%'.format(es*100))
+        fm = plt.get_current_fig_manager()
+        num = fm.num
+        fig = plt.figure(num)
+        if fig.texts:
+            fig.texts[0].remove()
+        plt.figtext(pos[0], pos[1], "Total charge is {:.1e}\n"
+                    "Energy spread is {:3.1f} %".format(tot_charge, es*100))
 
     def phase_space_hist(self, species, iteration, component1='z',
                          component2='uz', select=None, zeta_coord=False,
-                         **kwargs):
+                         mask=0., **kwargs):
         """
         Method that plots a 2D histogram of the particles phase space.
 
@@ -537,6 +590,9 @@ class Diag(object):
             Particle selector
         zeta_coord: bool
             If 'True' this sets the z values in co-moving frame
+        mask: float, optional
+            A float in [0,1] to exclude particles with <='mask' normalized
+            weights values.
         """
         cmap = 'Reds'
         bins = 1000
@@ -578,5 +634,5 @@ class Diag(object):
                            density=density)
         H = H.T
         X, Y = np.meshgrid(xedge, yedge)
-        H = np.ma.masked_where(H == 0, H)
+        H = np.ma.masked_where(H <= mask, H)
         plt.pcolormesh(X, Y, H, cmap=cmap, alpha=alpha)
