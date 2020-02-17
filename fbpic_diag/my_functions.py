@@ -128,6 +128,10 @@ def twiss(x, px, pz, w):
 
     return alpha, beta, gamma
 
+def mean_energy(gamma, w):
+    mean = np.ma.average(gamma, weights=w)
+    return mean*0.511
+
 def energy_spread(gamma, w):
     """
     Function to calculate energy spread of bunch's energy spectra
@@ -158,8 +162,8 @@ class Diag(object):
         self.avail_geom = self.ts.avail_geom
         self.avail_species = self.ts.avail_species
         self.avail_record_components = self.ts.avail_record_components
-        self.avail_bunch_prop = ['ph_emit', 'tr_emit', 'beam_size',
-                                 'momenta_spread', 'charge', 'en_spread', 'tw_alpha',
+        self.avail_bunch_prop = ['ph_emit', 'ph_emit_n', 'tr_emit', 'tr_emit_n', 'beam_size',
+                                 'momenta_spread', 'charge', 'mean_energy', 'en_spread', 'tw_alpha',
                                  'tw_beta', 'tw_gamma']
 
     def __normalize__(self, field_name, coord, N):
@@ -332,7 +336,7 @@ class Diag(object):
             F = e*(E + c*B)
         else:
             raise ValueError("You must specify a force component in \n"
-                             "\t\a x' or 'y' direction for 'coord'")
+                             "\t\a 'x' or 'y' direction for 'coord'")
         return F, info_e
 
     def lineout(self, field_name, iteration,
@@ -479,10 +483,13 @@ class Diag(object):
                 This sets which properties will be plotted in order you set the list.
                 You can choose from the following list:
                     - ph_emit (phase emittance)
+                    - ph_emit_n
                     - tr_emit (trace emittance)
+                    - tr_emit_n
                     - beam_size 
                     - momenta_spread
                     - charge
+                    - mean_energy
                     - en_spread (energy spread)
                     - tw_alpha, tw_beta, tw_gamma (Twiss parameters)
             species: string
@@ -509,12 +516,6 @@ class Diag(object):
                 To handle the plot output
 
         """
-        for n in range(len(properties)):
-            if properties[n] not in self.avail_bunch_prop:
-                raise ValueError('One or more property is not available. \nTry again')
-            else:
-                pass
-
         ptcl_percent = self.params['subsampling_fraction']
         if not t_lim:
             t_lim = [self.t.min(), self.t.max()]
@@ -522,274 +523,99 @@ class Diag(object):
         t = self.t[inds]
         z = c*t*1.e6  # in microns
         a = np.zeros_like(t)
-        
-        if zeta_coord and ('z' in select):
-            if time != 0.:
-                time = time
+
+        for n in range(len(properties)):
+            if properties[n] not in self.avail_bunch_prop:
+                prop = '\n -'.join(self.avail_bunch_prop)
+                raise ValueError("One or more property is not available. "
+                                 "Available properties are:\n -{:s}\nTry again".format(prop))
             else:
-                time = self.t[0]
-            if 'ph_emit' in properties:
-                for k, i in enumerate(t):
-                    selection = self.__comoving_selection__(i, time, select)
-                    x, ux, w = \
-                        self.ts.get_particle(['x', 'ux', 'w'],
-                                             t=i, select=selection,
-                                             species=species)
-                    a[k] = emittance(x, ux, w)
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('ph_emit')
-            if 'beam_size' in properties:
-                for k, i in enumerate(t):
-                    selection = self.__comoving_selection__(i, time, select)
-                    x, ux, w = \
-                        self.ts.get_particle(['x', 'ux', 'w'],
-                                             t=i, select=selection,
-                                             species=species)
-                    a[k] = beam_size(x, ux, w)
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('beam_size')
-            if 'momenta_spread' in properties:
-                for k, i in enumerate(t):
-                    selection = self.__comoving_selection__(i, time, select)
-                    x, ux, w = \
-                        self.ts.get_particle(['x', 'ux', 'w'],
-                                             t=i, select=selection,
-                                             species=species)
-                    a[k] = momenta_spread(x, ux, w)
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('momenta_spread')
-            if 'charge' in properties:
-                for k, i in enumerate(t):
-                    selection = self.__comoving_selection__(i, time, select)
-                    w = \
-                        self.ts.get_particle(['w'],
-                                             t=i, select=selection,
-                                             species=species)[0]
-                    a[k] = e*w.sum()/ptcl_percent
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('charge')
-            if 'en_spread' in properties:
-                for k, i in enumerate(t):
-                    selection = self.__comoving_selection__(i, time, select)
-                    gamma, w = \
-                        self.ts.get_particle(['gamma', 'w'],
-                                             t=i, select=selection,
-                                             species=species)
-                    a[k] = energy_spread(gamma, w)
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('en_spread')
-            if 'tr_emit' in properties:
-                for k, i in enumerate(t):
-                    selection = self.__comoving_selection__(i, time, select)
-                    x, ux, uz, w = \
-                        self.ts.get_particle(['x', 'ux', 'uz', 'w'],
-                                             t=i, select=selection,
-                                             species=species)
-                    slope = divergence(px=ux, pz=uz)
-                    a[k] = emittance(x, slope, w)
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('tr_emit')
-            if 'tw_alpha' in properties:
-                for k, i in enumerate(t):
-                    selection = self.__comoving_selection__(i, time, select)
-                    x, ux, uz, w = \
-                        self.ts.get_particle(['x', 'ux', 'uz', 'w'],
-                                             t=i, select=selection,
-                                             species=species)
-                    a[k] = twiss(x, ux, uz, w)[0]
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('tw_alpha')
-            if 'tw_beta' in properties:
-                for k, i in enumerate(t):
-                    selection = self.__comoving_selection__(i, time, select)
-                    x, ux, uz, w = \
-                        self.ts.get_particle(['x', 'ux', 'uz', 'w'],
-                                             t=i, select=selection,
-                                             species=species)
-                    a[k] = twiss(x, ux, uz, w)[1]
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('tw_beta')
-            if 'tw_gamma' in properties:
-                for k, i in enumerate(t):
-                    selection = self.__comoving_selection__(i, time, select)
-                    x, ux, uz, w = \
-                        self.ts.get_particle(['x', 'ux', 'uz', 'w'],
-                                             t=i, select=selection,
-                                             species=species)
-                    a[k] = twiss(x, ux, uz, w)[2]
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('tw_gamma')
-        else:
-            if 'ph_emit' in properties:
-                for k, i in enumerate(t):
-                    x, ux, w = \
-                        self.ts.get_particle(['x', 'ux', 'w'],
-                                             t=i, select=select,
-                                             species=species)
-                    a[k] = emittance(x, ux, w)
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('ph_emit')
-            if 'beam_size' in properties:
-                for k, i in enumerate(t):
-                    x, ux, w = \
-                        self.ts.get_particle(['x', 'ux', 'w'],
-                                             t=i, select=select,
-                                             species=species)
-                    a[k] = beam_size(x, ux, w)
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('beam_size')
-            if 'momenta_spread' in properties:
-                for k, i in enumerate(t):
-                    x, ux, w = \
-                        self.ts.get_particle(['x', 'ux', 'w'],
-                                             t=i, select=select,
-                                             species=species)
-                    a[k] = momenta_spread(x, ux, w)
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('momenta_spread')
-            if 'charge' in properties:
-                for k, i in enumerate(t):
-                    w = self.ts.get_particle(['w'],t=i, select=select,
-                                             species=species)[0]
-                    a[k] = e*w.sum()/ptcl_percent
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('charge')
-            if 'en_spread' in properties:
-                for k, i in enumerate(t):
-                    gamma, w = \
-                        self.ts.get_particle(['gamma', 'w'],
-                                             t=i, select=select,
-                                             species=species)
-                    a[k] = energy_spread(gamma, w)
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('en_spread')
-            if 'tr_emit' in properties:
-                for k, i in enumerate(t):
-                    x, ux, uz, w = \
-                        self.ts.get_particle(['x', 'ux', 'uz', 'w'],
-                                             t=i, select=select,
-                                             species=species)
-                    slope = divergence(px=ux, pz=uz)
-                    a[k] = emittance(x, slope, w)
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('tr_emit')
-            if 'tw_alpha' in properties:
-                for k, i in enumerate(t):
-                    x, ux, uz, w = \
-                        self.ts.get_particle(['x', 'ux', 'uz', 'w'],
-                                             t=i, select=select,
-                                             species=species)
-                    a[k] = twiss(x, ux, uz, w)[0]
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('tw_alpha')
-            if 'tw_beta' in properties:
-                for k, i in enumerate(t):
-                    x, ux, uz, w = \
-                        self.ts.get_particle(['x', 'ux', 'uz', 'w'],
-                                             t=i, select=select,
-                                             species=species)
-                    a[k] = twiss(x, ux, uz, w)[1]
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('tw_beta')
-            if 'tw_gamma' in properties:
-                for k, i in enumerate(t):
-                    x, ux, uz, w = \
-                        self.ts.get_particle(['x', 'ux', 'uz', 'w'],
-                                             t=i, select=select,
-                                             species=species)
-                    a[k] = twiss(x, ux, uz, w)[2]
-                if plot_over and (len(properties) == 1):
-                    plt.plot(z, a, **kwargs)
-                else:        
-                    plt.figure()
-                    plt.plot(z, a)
-                    plt.xlim(left=z.min())
-                    plt.title('tw_gamma')
+                if zeta_coord and ('z' in select):
+                    if time != 0.:
+                        time = time
+                    else:
+                        time = self.t[0]                
+                    for k, i in enumerate(t):
+                        selection = self.__comoving_selection__(i, time, select)
+                        x, ux, uz, gamma, w = \
+                            self.ts.get_particle(['x', 'ux', 'uz', 'gamma', 'w'],
+                                                 t=i, select=selection,
+                                                 species=species)
+                        if properties[n] == 'ph_emit':
+                            a[k] = emittance(x, ux, w)*m_e*c
+                        if properties[n] == 'ph_emit_n':
+                            a[k] = emittance(x, ux, w)
+                        if properties[n] == 'beam_size':
+                            a[k] = beam_size(x, ux, w)
+                        if properties[n] == 'momenta_spread':
+                            a[k] = momenta_spread(x, ux, w)
+                        if properties[n] == 'charge':
+                            a[k] = e*w.sum()/ptcl_percent
+                        if properties[n] == 'mean_energy':
+                            a[k] = mean_energy(gamma,w)
+                        if properties[n] == 'en_spread':
+                            a[k] = energy_spread(gamma, w)
+                        if properties[n] == 'tr_emit':
+                            slope = divergence(px=ux, pz=uz)
+                            a[k] = emittance(x, slope, w)
+                        if properties[n] == 'tr_emit_n':
+                            slope = divergence(px=ux, pz=uz)
+                            mean_uz = np.ma.average(uz, weights=w)
+                            a[k] = mean_uz*emittance(x, slope, w)
+                        if properties[n] == 'tw_alpha':
+                            a[k] = twiss(x, ux, uz, w)[0]
+                        if properties[n] == 'tw_beta':
+                            a[k] = twiss(x, ux, uz, w)[1]
+                        if properties[n] == 'tw_gamma':
+                            a[k] = twiss(x, ux, uz, w)[2]
+                    if plot_over and (len(properties) == 1):
+                        plt.plot(z, a, **kwargs)
+                    else:        
+                        plt.figure()
+                        plt.title(properties[n])
+                        plt.plot(z, a)
+                        plt.xlim(left=z.min())
+
+                else:
+                    for k, i in enumerate(t):
+                        x, ux, uz, gamma, w = \
+                            self.ts.get_particle(['x', 'ux', 'uz', 'gamma', 'w'],
+                                                 t=i, select=select,
+                                                 species=species)
+                        if properties[n] == 'ph_emit_n':
+                            a[k] = emittance(x, ux, w)
+                        if properties[n] == 'ph_emit':
+                            a[k] = m_e*c*emittance(x, ux, w)
+                        if properties[n] == 'beam_size':
+                            a[k] = beam_size(x, ux, w)
+                        if properties[n] == 'momenta_spread':
+                            a[k] = momenta_spread(x, ux, w)
+                        if properties[n] == 'charge':
+                            a[k] = e*w.sum()/ptcl_percent
+                        if properties[n] == 'mean_energy':
+                            a[k] = mean_energy(gamma, w)
+                        if properties[n] == 'en_spread':
+                            a[k] = energy_spread(gamma, w)
+                        if properties[n] == 'tr_emit':
+                            slope = divergence(px=ux, pz=uz)
+                            a[k] = emittance(x, slope, w)
+                        if properties[n] == 'tr_emit_n':
+                            slope = divergence(px=ux, pz=uz)
+                            mean_uz = np.ma.average(uz, weights=w)
+                            a[k] = mean_uz*emittance(x, slope, w)
+                        if properties[n] == 'tw_alpha':
+                            a[k] = twiss(x, ux, uz, w)[0]
+                        if properties[n] == 'tw_beta':
+                            a[k] = twiss(x, ux, uz, w)[1]
+                        if properties[n] == 'tw_gamma':
+                            a[k] = twiss(x, ux, uz, w)[2]
+                    if plot_over and (len(properties) == 1):
+                        plt.plot(z, a, **kwargs)
+                    else:        
+                        plt.figure()
+                        plt.title(properties[n])
+                        plt.plot(z, a)
+                        plt.xlim(left=z.min())
 
     def spectrum(self, iteration, select=None, species='electrons',
                  energy=False, charge=False, **kwargs):
@@ -831,6 +657,7 @@ class Diag(object):
         gamma, w = self.ts.get_particle(['gamma', 'w'], iteration=iteration,
                                         species=species, select=select)
         es = energy_spread(gamma, w)
+        me = mean_energy(gamma, w)
         tot_charge = w.sum()*q*in_ptcl_percent
 
         pos = [0.7, 0.7]
@@ -844,8 +671,9 @@ class Diag(object):
         fig = plt.figure(num)
         if fig.texts:
             fig.texts[0].remove()
-        plt.figtext(pos[0], pos[1], "Total charge is {:.1e}\n"
-                    "Energy spread is {:3.1f} %".format(tot_charge, es*100))
+        plt.figtext(pos[0], pos[1], "Total charge is {:.1e} C\n"
+                                    "Mean energy is {:.2f} MeV\n"
+                                    "Energy spread is {:3.1f} %".format(tot_charge, me, es*100))
 
     def phase_space_hist(self, species, iteration, components=['z','uz'],
                          select=None, zeta_coord=False,
