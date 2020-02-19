@@ -153,6 +153,8 @@ class Diag(object):
     A class to handle diagnostics of a plasma simulation;
     pass the path of hd5f files
     """
+    plt.ion()
+
     def __init__(self, path):
         self.ts = OpenPMDTimeSeries(path)
         self.params = json.load(open('params.json'))
@@ -246,10 +248,9 @@ class Diag(object):
 
             Z[n] = (z[inds].mean())
 
-            s_prop = emittance(x[inds], ux[inds], w[inds])
-            s_emit[n] = (s_prop[0])
-            s_sigma_x2[n] = (s_prop[1])
-            s_sigma_ux2[n] = (s_prop[2])
+            s_emit[n] = emittance(x[inds], ux[inds], w[inds])
+            s_sigma_x2[n] = beam_size(x[inds], ux[inds], w[inds])
+            s_sigma_ux2[n] = momenta_spread(x[inds], ux[inds], w[inds])
 
         S_prop = {'s_emit': s_emit, 's_sigma_x2': s_sigma_x2,
                   's_sigma_ux2': s_sigma_ux2, 'z': Z}
@@ -289,7 +290,7 @@ class Diag(object):
                 H = H.T
                 X, Y = np.meshgrid(xedge, yedge)
                 H = np.ma.masked_where(H <= mask, H)
-                plt.pcolormesh(X, Y, H, cmap=cmap[n+1], alpha=alpha)
+                plt.pcolormesh(X, Y, H, cmap=cmap[n+1], alpha=alpha,**kwargs)
         return S_prop, dz
 
     def potential(self, iteration, theta=0, m='all'):
@@ -726,20 +727,24 @@ class Diag(object):
         if 'div1' in components:
             if components.index('div1') == 0:
                 px, pz, comp2, weight = \
-                    self.ts.get_particle(['ux', 'uz', components[1],'w'])
+                    self.ts.get_particle(['ux', 'uz', components[1],'w'],iteration=iteration,
+                                         select=select,species=species)
                 comp1 = divergence(px=px, pz=pz)
             else:
                 px, pz, comp1, weight = \
-                    self.ts.get_particle(['ux', 'uz', components[0],'w'])
+                    self.ts.get_particle(['ux', 'uz', components[0],'w'],iteration=iteration,
+                                         select=select,species=species)
                 comp2 = divergence(px=px, pz=pz)
         elif 'div2' in components:
             if components.index('div2') == 0:
                 px, py, pz, comp2, weight = \
-                    self.ts.get_particle(['ux', 'uy', 'uz', components[1],'w'])
+                    self.ts.get_particle(['ux', 'uy', 'uz', components[1],'w'],iteration=iteration,
+                                         select=select,species=species)
                 comp1 = divergence(px=px, py=py, pz=pz)
             else:
                 px, py, pz, comp1, weight = \
-                    self.ts.get_particle(['ux', 'uy', 'uz', components[0],'w'])
+                    self.ts.get_particle(['ux', 'uy', 'uz', components[0],'w'],iteration=iteration,
+                                         select=select,species=species)
                 comp2 = divergence(px=px, py=py, pz=pz)
         else:
             comp1, comp2, weight = \
@@ -762,4 +767,4 @@ class Diag(object):
         H = H.T
         X, Y = np.meshgrid(xedge, yedge)
         H = np.ma.masked_where(H <= mask, H)
-        plt.pcolormesh(X, Y, H, cmap=cmap, alpha=alpha)
+        plt.pcolormesh(X, Y, H, cmap=cmap, alpha=alpha,**kwargs)
