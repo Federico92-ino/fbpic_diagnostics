@@ -157,7 +157,7 @@ class Diag(object):
 
     def __init__(self, path):
         self.ts = OpenPMDTimeSeries(path)
-        self.params = json.load(open('/params.json'))
+        self.params = json.load(open('params.json'))
         self.iterations = self.ts.iterations
         self.t = self.ts.t
         self.avail_fields = self.ts.avail_fields
@@ -624,7 +624,7 @@ class Diag(object):
                         plt.xlim(left=z.min())
 
     def spectrum(self, iteration, select=None, species='electrons',
-                 energy=False, charge=False, Z=1, **kwargs):
+                 output=False, energy=False, charge=False, Z=1, **kwargs):
         """
         Method to easily get an energy spectrum of 'selected' particles
 
@@ -636,6 +636,10 @@ class Diag(object):
                 Particle selector
             species: str, optional
                 Default is 'electrons'
+            output: bool, optional, default: 'False'
+                If 'True' returns the values of histogram and bins
+                edges; length of bins array is nbins+1 
+                (lefts edges and right edge of the last bin).
             energy: bool, optional
                 If 'True' this sets the x-axis on energy(MeV),
                 otherwise x-axis has dimensionless gamma values.
@@ -673,7 +677,8 @@ class Diag(object):
             pos = kwargs['text_pos']
             del kwargs['text_pos']
 
-        plt.hist(a*gamma, weights=q*in_ptcl_percent*w, **kwargs)
+        values, bins, patches = plt.hist(a*gamma, weights=q*in_ptcl_percent*w, **kwargs)
+        del patches
         fm = plt.get_current_fig_manager()
         num = fm.num
         fig = plt.figure(num)
@@ -682,6 +687,8 @@ class Diag(object):
         plt.figtext(pos[0], pos[1], "Total charge is {:.1e} C\n"
                                     "Mean energy is {:.2f} MeV\n"
                                     "Energy spread is {:3.1f} %".format(tot_charge, me, es*100))
+        if output:
+            return values, bins
 
     def phase_space_hist(self, species, iteration, components=['z','uz'],
                          select=None, zeta_coord=False,
