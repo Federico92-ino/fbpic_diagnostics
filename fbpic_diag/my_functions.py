@@ -157,7 +157,7 @@ class Diag(object):
 
     def __init__(self, path):
         self.ts = OpenPMDTimeSeries(path)
-        self.params = json.load(open('params.json'))
+        self.params = json.load(open('/params.json'))
         self.iterations = self.ts.iterations
         self.t = self.ts.t
         self.avail_fields = self.ts.avail_fields
@@ -408,7 +408,7 @@ class Diag(object):
         plt.plot(z, E/E0, **kwargs)
 
     def map(self, field_name, iteration,
-            coord=None, theta=0, m='all', normalize=False, N=None, **kwargs):
+            coord=None, theta=0, m='all', normalize=False, N=None, zeta_coord=False, **kwargs):
         """
         Method to get a 2D-map of passed field_name
 
@@ -432,6 +432,8 @@ class Diag(object):
                       density
                     - m_e*c*omega_0/e for transverse 'E'
                     - m_e*c*omega_p/e for longitudinal 'E'
+            zeta_coord: bool;
+                    If 'True' sets the co-moving frame
             **kwargs: keywords to pass to .Axes.imshow() method
         **Return**
 
@@ -455,7 +457,10 @@ class Diag(object):
         if 'origin' in kwargs:
             origin = kwargs['origin']
             del kwargs['origin']
-        ax.imshow(E/E0, extent=info_e.imshow_extent*1.e6,
+        extent = info_e.imshow_extent.copy()
+        if zeta_coord:
+            extent[0:2]-=c*self.ts.current_t
+        ax.imshow(E/E0, extent=extent*1.e6,
                   origin=origin, **kwargs)
         fig.colorbar(ax.get_images()[0], ax=ax, use_gridspec=True)
 
@@ -619,7 +624,7 @@ class Diag(object):
                         plt.xlim(left=z.min())
 
     def spectrum(self, iteration, select=None, species='electrons',
-                 energy=False, charge=False, **kwargs):
+                 energy=False, charge=False, Z=1, **kwargs):
         """
         Method to easily get an energy spectrum of 'selected' particles
 
@@ -639,6 +644,8 @@ class Diag(object):
                 If True this sets the y-axis on dQ/dE values,
                 multiplying the weights for electron charge.
                 Default is False, that means setting y-axis on dN/dE values
+            Z: int
+                The atomic number of ion; default is 1.
             **kwargs: keyword to pass to .hist() method; in kwargs you can also
                     set the position of text inset in 'figure' frame [(0.,1.),(0.,1.)].
                     Default is [0.7,0.7].
@@ -653,13 +660,13 @@ class Diag(object):
         if energy:
             a = 0.511
         q = 1
-        if charge:
-            q = e
+        if charge and Z:
+            q = Z*e
         gamma, w = self.ts.get_particle(['gamma', 'w'], iteration=iteration,
                                         species=species, select=select)
         es = energy_spread(gamma, w)
         me = mean_energy(gamma, w)
-        tot_charge = w.sum()*q*in_ptcl_percent
+        tot_charge = w.sum()*e*in_ptcl_percent
 
         pos = [0.7, 0.7]
         if 'text_pos' in kwargs:
