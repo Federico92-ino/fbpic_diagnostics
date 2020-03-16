@@ -40,33 +40,20 @@ def divergence(px=None, py=None, pz=None):
 
     return div
 
-def beam_size(x, ux, w):
+def central_average(x, w):
     """
-    Function to calculate size of a bunch.
+    Function to calculate the second order momentum of quantity x
+    with w-distribution.
     **Parameters**
-    x, ux: two 1darrays of  phase-space coords
+    x: 1darrays of particles' phase space coord 
     w: ndarray of particles' weights
     **Returns**
-    beam size: float
+    average: float
     """
     x_mean = np.ma.average(x, weights=w)
     sigma_x2 = np.ma.average((x-x_mean)**2, weights=w)
-    beam_size = np.sqrt(sigma_x2)
-    return beam_size
-
-def momenta_spread(x, ux, w):
-    """
-    Function to calculate momenta spread of a bunch.
-    **Parameters**
-    x, ux: two 1darrays of  phase-space coords
-    w: ndarray of particles' weights
-    **Returns**
-    momenta spread: float
-    """    
-    ux_mean = np.ma.average(ux, weights=w)
-    sigma_ux2 = np.ma.average((ux-ux_mean)**2, weights=w)
-    momenta = np.sqrt(sigma_ux2)
-    return momenta
+    average = np.sqrt(sigma_x2)
+    return average
 
 def covar(x, ux, w):
     """
@@ -91,8 +78,8 @@ def emittance(x, ux, w):
     **Returns**
     emittance: float
     """
-    sigma_x = beam_size(x, ux, w)
-    sigma_ux = momenta_spread(x, ux, w)
+    sigma_x = central_average(x, w)
+    sigma_ux = central_average(ux, w)
     covariance = covar(x, ux, w)
     
     emit = np.sqrt(sigma_x**2*sigma_ux**2-covariance**2)
@@ -117,8 +104,8 @@ def twiss(x, px, pz, w):
     """
     slope = divergence(px=px, pz=pz)
     emit = emittance(x, slope, w)
-    sigma_x = beam_size(x, slope, w)
-    sigma_slope = momenta_spread(x, slope, w)
+    sigma_x = central_average(x, w)
+    sigma_slope = central_average(slope, w)
     covariance = covar(x, slope, w)
     inv_emit=1/emit
     
@@ -142,9 +129,9 @@ def energy_spread(gamma, w):
             An array of weights
     """
     mean = np.ma.average(gamma, weights=w)
-    mean2 = np.ma.average(gamma**2, weights=w)
-    sigma2 = (mean2 - mean**2)/mean**2
-    return np.sqrt(sigma2)
+    average = central_average(gamma, w)
+    sigma = average/mean
+    return sigma
 
 
 class Diag(object):
@@ -199,7 +186,8 @@ class Diag(object):
         return selection
 
 
-    def slice_emit(self, N, plot=False, comp1='x', comp2='ux', mask=0., **kwargs):
+    def slice_emit(self, N, select=None, iteration=0, species='electrons',
+                   plot=False, components=['x','ux'], mask=0., **kwargs):
         """
         Function to calculate slice emittances of a 'N sliced' bunch
 
@@ -213,7 +201,7 @@ class Diag(object):
             mask: float
                 A value to mask undesired points in plot. 
             **kwargs
-                Same parameters of .get_particle(), except 'var_list'.
+                Parameters of .pcolormesh method.
 
         **Returns**
 
@@ -223,17 +211,13 @@ class Diag(object):
             dz: float
                 Longitudinal slices' thickness.
         """
-        if 'var_list' in kwargs:
-            raise Exception("You don't need to pass 'var_list' argument!\n" 
-                            "Try again with just the others kwargs\n"
-                            "of .get_particle()")
 
-        x, ux, z, w= self.ts.get_particle(['x', 'ux', 'z', 'w'], **kwargs)
+        x, ux, z, w= self.ts.get_particle(['x', 'ux', 'z', 'w'], select=select, iteration=iteration, species=species)
         dz = (z.max()-z.min())/N
 
         s_emit = np.zeros(N)
-        s_sigma_x2 = np.zeros(N)
-        s_sigma_ux2 = np.zeros(N)
+        s_sigma_x = np.zeros(N)
+        s_sigma_ux = np.zeros(N)
         Z = np.zeros(N)
 
         a = z.argsort()
@@ -249,16 +233,18 @@ class Diag(object):
             Z[n] = (z[inds].mean())
 
             s_emit[n] = emittance(x[inds], ux[inds], w[inds])
-            s_sigma_x2[n] = beam_size(x[inds], ux[inds], w[inds])
-            s_sigma_ux2[n] = momenta_spread(x[inds], ux[inds], w[inds])
+            s_sigma_x[n] = central_average(x[inds], w[inds])
+            s_sigma_ux[n] = central_average(ux[inds], w[inds])
 
-        S_prop = {'s_emit': s_emit, 's_sigma_x2': s_sigma_x2,
-                  's_sigma_ux2': s_sigma_ux2, 'z': Z}
+        S_prop = {'s_emit': s_emit, 's_sigma_x': s_sigma_x,
+                  's_sigma_ux': s_sigma_ux, 'z': Z}
         if plot:
             cmap = ['Reds', 'Blues', 'Greens']
             bins = 1000
             density = True
             alpha = 1
+            zeta_coord = False
+            v_w = self.params['v_window']
 
             if 'cmap' in kwargs:
                 cmap = kwargs['cmap']
@@ -274,14 +260,50 @@ class Diag(object):
 
             if 'alpha' in kwargs:
                 alpha = kwargs['alpha']
-                del kwargs['alpha']        
+                del kwargs['alpha']
+            if 'zeta_coord' in kwargs:
+                zeta_coord = kwargs['zeta_coord']
+                del kwargs['zeta_coord']
 
-            x, ux, w = self.ts.get_particle([comp1, comp2, 'w'], **kwargs)
+            if 'div1' in components:
+                if components.index('div1') == 0:
+                    px, pz, comp2, weight = \
+                        self.ts.get_particle(['ux', 'uz', components[1],'w'],iteration=iteration,
+                                             select=select,species=species)
+                    comp1 = divergence(px=px, pz=pz)
+                else:
+                    px, pz, comp1, weight = \
+                        self.ts.get_particle(['ux', 'uz', components[0],'w'],iteration=iteration,
+                                             select=select,species=species)
+                    comp2 = divergence(px=px, pz=pz)
+            elif 'div2' in components:
+                if components.index('div2') == 0:
+                    px, py, pz, comp2, weight = \
+                        self.ts.get_particle(['ux', 'uy', 'uz', components[1],'w'],iteration=iteration,
+                                             select=select,species=species)
+                    comp1 = divergence(px=px, py=py, pz=pz)
+                else:
+                    px, py, pz, comp1, weight = \
+                        self.ts.get_particle(['ux', 'uy', 'uz', components[0],'w'],iteration=iteration,
+                                             select=select,species=species)
+                    comp2 = divergence(px=px, py=py, pz=pz)
+            else:
+                comp1, comp2, weight = \
+                    self.ts.get_particle([components[0], components[1], 'w'],
+                                         iteration=iteration, select=select,
+                                         species=species)
+
+            if 'z' in components and zeta_coord:
+                t = self.ts.current_t
+                if components.index('z') == 0:
+                    comp1 -= v_w*t*1.e6
+                else:
+                    comp2 -= v_w*t*1.e6
             for n in range(-1, 2):
                 inds = np.where((z >= z.mean()+n*np.sqrt(z.var())-dz/2) &
                                 (z <= z.mean()+n*np.sqrt(z.var())+dz/2))
-                X = x[inds]
-                UX = ux[inds]
+                X = comp1[inds]
+                UX = comp2[inds]
                 weight = w[inds]
                 H, xedge, yedge = \
                     np.histogram2d(X, UX,
@@ -552,9 +574,9 @@ class Diag(object):
                         if properties[n] == 'ph_emit_n':
                             a[k] = emittance(x, ux, w)
                         if properties[n] == 'beam_size':
-                            a[k] = beam_size(x, ux, w)
+                            a[k] = central_average(x, w)
                         if properties[n] == 'momenta_spread':
-                            a[k] = momenta_spread(x, ux, w)
+                            a[k] = central_average(ux, w)
                         if properties[n] == 'charge':
                             a[k] = e*w.sum()/ptcl_percent
                         if properties[n] == 'mean_energy':
@@ -593,9 +615,9 @@ class Diag(object):
                         if properties[n] == 'ph_emit':
                             a[k] = m_e*c*emittance(x, ux, w)
                         if properties[n] == 'beam_size':
-                            a[k] = beam_size(x, ux, w)
+                            a[k] = central_average(x, w)
                         if properties[n] == 'momenta_spread':
-                            a[k] = momenta_spread(x, ux, w)
+                            a[k] = central_average(ux, w)
                         if properties[n] == 'charge':
                             a[k] = e*w.sum()/ptcl_percent
                         if properties[n] == 'mean_energy':
@@ -721,6 +743,7 @@ class Diag(object):
         bins = 1000
         density = True
         alpha = 1
+        v_w = self.params['v_window']
 
         if 'cmap' in kwargs:
             cmap = kwargs['cmap']
@@ -769,9 +792,9 @@ class Diag(object):
         if 'z' in components and zeta_coord:
             t = self.ts.current_t
             if components.index('z') == 0:
-                comp1 -= c*t*1.e6
+                comp1 -= v_w*t*1.e6
             else:
-                comp2 -= c*t*1.e6
+                comp2 -= v_w*t*1.e6
 
 
         H, xedge, yedge = \
