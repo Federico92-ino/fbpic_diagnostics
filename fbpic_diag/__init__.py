@@ -4,6 +4,6 @@ from .my_functions import emittance
 from .my_functions import central_average
 from .my_functions import covar
 from .my_functions import energy_spread
-from .my_functions import mean_energy
+from .my_functions import mean
 from .my_functions import twiss
 from .__about__ import __version__

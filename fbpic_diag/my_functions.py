@@ -115,9 +115,11 @@ def twiss(x, px, pz, w):
 
     return alpha, beta, gamma
 
-def mean_energy(gamma, w):
-    mean = np.ma.average(gamma, weights=w)
-    return mean*0.511
+def mean(x, w, energy=False):
+    mean = np.ma.average(x, weights=w)
+    if energy:
+        mean *= 0.511
+    return mean
 
 def energy_spread(gamma, w):
     """
@@ -299,6 +301,9 @@ class Diag(object):
                     comp1 -= v_w*t*1.e6
                 else:
                     comp2 -= v_w*t*1.e6
+            comp1 = comp1[a]
+            comp2 = comp2[a]
+            weight = weight[a]
             for n in range(-1, 2):
                 inds = np.where((z >= z.mean()+n*np.sqrt(z.var())-dz/2) &
                                 (z <= z.mean()+n*np.sqrt(z.var())+dz/2))
@@ -580,7 +585,7 @@ class Diag(object):
                         if properties[n] == 'charge':
                             a[k] = e*w.sum()/ptcl_percent
                         if properties[n] == 'mean_energy':
-                            a[k] = mean_energy(gamma,w)
+                            a[k] = mean(gamma,w,energy=True)
                         if properties[n] == 'en_spread':
                             a[k] = energy_spread(gamma, w)
                         if properties[n] == 'tr_emit':
@@ -621,7 +626,7 @@ class Diag(object):
                         if properties[n] == 'charge':
                             a[k] = e*w.sum()/ptcl_percent
                         if properties[n] == 'mean_energy':
-                            a[k] = mean_energy(gamma, w)
+                            a[k] = mean(gamma, w, energy=True)
                         if properties[n] == 'en_spread':
                             a[k] = energy_spread(gamma, w)
                         if properties[n] == 'tr_emit':
@@ -645,13 +650,17 @@ class Diag(object):
                         plt.plot(z, a)
                         plt.xlim(left=z.min())
 
-    def spectrum(self, iteration, select=None, species='electrons',
+    def spectrum(self, component, iteration, select=None, species='electrons',
                  output=False, energy=False, charge=False, Z=1, **kwargs):
         """
         Method to easily get an energy spectrum of 'selected' particles
 
         **Parameters**
 
+            
+            component: str
+                Choose a component in .avail_recorded_components
+                to do the weighted distibution of that quantity
             iteration: int
                 Which iteration we need
             select: dictionary or ParticleTracker instance
@@ -672,7 +681,7 @@ class Diag(object):
                 Default is False, that means setting y-axis on dN/dE values
             Z: int
                 The atomic number of ion; default is 1.
-            **kwargs: keyword to pass to .hist() method; in kwargs you can also
+            **kwargs: keyword to pass to .hist() method; in kwargs['text_pos'] you can also
                     set the position of text inset in 'figure' frame [(0.,1.),(0.,1.)].
                     Default is [0.7,0.7].
 
@@ -682,33 +691,39 @@ class Diag(object):
 
         """
         in_ptcl_percent = 1/self.params['subsampling_fraction']
-        a = 1
-        if energy:
-            a = 0.511
-        q = 1
-        if charge and Z:
-            q = Z*e
-        gamma, w = self.ts.get_particle(['gamma', 'w'], iteration=iteration,
-                                        species=species, select=select)
-        es = energy_spread(gamma, w)
-        me = mean_energy(gamma, w)
-        tot_charge = w.sum()*e*in_ptcl_percent
 
+        q = 1
+        if charge:
+            q = Z*e
+        comp, w = self.ts.get_particle([component, 'w'], iteration=iteration,
+                                        species=species, select=select)
+        tot_charge = w.sum()*e*in_ptcl_percent
+        if component=='gamma' and energy:
+            a = 0.511        
+            es = energy_spread(comp, w)
+            me = mean(comp, w, energy=True)
+        else:
+            a = 1
+            es = central_average(comp, w)
+            me = mean(comp, w)
         pos = [0.7, 0.7]
         if 'text_pos' in kwargs:
             pos = kwargs['text_pos']
             del kwargs['text_pos']
 
-        values, bins, patches = plt.hist(a*gamma, weights=q*in_ptcl_percent*w, **kwargs)
+        values, bins, patches = plt.hist(a*comp, weights=q*in_ptcl_percent*w, **kwargs)
         del patches
-        fm = plt.get_current_fig_manager()
-        num = fm.num
-        fig = plt.figure(num)
+        fig = plt.gcf()
         if fig.texts:
             fig.texts[0].remove()
-        plt.figtext(pos[0], pos[1], "Total charge is {:.1e} C\n"
-                                    "Mean energy is {:.2f} MeV\n"
-                                    "Energy spread is {:3.1f} %".format(tot_charge, me, es*100))
+        if energy:
+            plt.figtext(pos[0], pos[1], "Total charge is {:.1e} C\n"
+                                        "Mean energy is {:.2f} MeV\n"
+                                        "Energy spread is {:3.1f} %".format(tot_charge, me, es*100))
+        else:
+            plt.figtext(pos[0], pos[1], "Total charge is {:.1e}C\n"
+                                        "Mean is {:.2f}\n"
+                                        "Standar deviation is {:.1f}".format(tot_charge,me,es))
         if output:
             return values, bins
 
