@@ -9,7 +9,6 @@ from opmd_viewer import OpenPMDTimeSeries
 import json
 from scipy.constants import e, m_e, c
 
-
 def divergence(px=None, py=None, pz=None):
 
     """
@@ -189,7 +188,7 @@ class Diag(object):
 
 
     def slice_emit(self, N, select=None, iteration=0, species='electrons',
-                   plot=False, components=['x','ux'], mask=0., **kwargs):
+                   plot=False, components=['x','ux'], mask=0., trans_space='x', **kwargs):
         """
         Function to calculate slice emittances of a 'N sliced' bunch
 
@@ -198,10 +197,12 @@ class Diag(object):
             N: int, number of slices
             plot: bool
                 If 'True' returns the plot. Default is 'False'.
-            comp1, comp2: str
+            components: list of str
                 The components of phase-space to plot. Default is 'x','ux'.
             mask: float
-                A value to mask undesired points in plot. 
+                A value to mask undesired points in plot.
+            trans_space: str
+                Transverse phase space to consider in calculation: 'x' or 'y'; default is 'x'
             **kwargs
                 Parameters of .pcolormesh method.
 
@@ -213,8 +214,13 @@ class Diag(object):
             dz: float
                 Longitudinal slices' thickness.
         """
-
-        x, ux, z, w= self.ts.get_particle(['x', 'ux', 'z', 'w'], select=select, iteration=iteration, species=species)
+        if trans_space == 'y':
+            A = 'y'
+            B = 'uy'
+        else:
+            A = 'x'
+            B = 'ux'
+        x, ux, z, w= self.ts.get_particle([A, B, 'z', 'w'], select=select, iteration=iteration, species=species)
         dz = (z.max()-z.min())/N
 
         s_emit = np.zeros(N)
@@ -267,8 +273,8 @@ class Diag(object):
                 zeta_coord = kwargs['zeta_coord']
                 del kwargs['zeta_coord']
 
-            if 'div1' in components:
-                if components.index('div1') == 0:
+            if 'div_x' in components:
+                if components.index('div_x') == 0:
                     px, pz, comp2, weight = \
                         self.ts.get_particle(['ux', 'uz', components[1],'w'],iteration=iteration,
                                              select=select,species=species)
@@ -276,6 +282,17 @@ class Diag(object):
                 else:
                     px, pz, comp1, weight = \
                         self.ts.get_particle(['ux', 'uz', components[0],'w'],iteration=iteration,
+                                             select=select,species=species)
+                    comp2 = divergence(px=px, pz=pz)
+            elif 'div_y' in components:
+                if components.index('div_y') == 0:
+                    px, pz, comp2, weight = \
+                        self.ts.get_particle(['uy', 'uz', components[1],'w'],iteration=iteration,
+                                             select=select,species=species)
+                    comp1 = divergence(px=px, pz=pz)
+                else:
+                    px, pz, comp1, weight = \
+                        self.ts.get_particle(['uy', 'uz', components[0],'w'],iteration=iteration,
                                              select=select,species=species)
                     comp2 = divergence(px=px, pz=pz)
             elif 'div2' in components:
@@ -493,7 +510,7 @@ class Diag(object):
 
         return fig, ax
 
-    def bunch_properties_evolution(self, select, properties, species='electrons',
+    def bunch_properties_evolution(self, select, properties, species='electrons', trans_space='x',
                                     zeta_coord=False, time=0., t_lim=False, plot_over=False,**kwargs):
         """
         Method to select a bunch and to plot the evolution of
@@ -529,6 +546,8 @@ class Diag(object):
                 A string indicating the name of the species
                 This is optional if there is only one species;
                 default is 'electrons'.
+            trans_space: str
+                'x' or 'y' transverse phase space; default is 'x'
             zeta_coord: bool
                 If 'True' the 'z' selection is done in co-moving frame
             time: float
@@ -556,6 +575,12 @@ class Diag(object):
         t = self.t[inds]
         z = c*t*1.e6  # in microns
         a = np.zeros_like(t)
+        if trans_space == 'y':
+            A = 'y'
+            B = 'uy'
+        else:
+            A = 'x'
+            B = 'ux'        
 
         for n in range(len(properties)):
             if properties[n] not in self.avail_bunch_prop:
@@ -564,14 +589,16 @@ class Diag(object):
                                  "Available properties are:\n -{:s}\nTry again".format(prop))
             else:
                 if zeta_coord and ('z' in select):
+                    
                     if time != 0.:
                         time = time
                     else:
-                        time = self.t[0]                
+                        time = self.t[0]
+                                        
                     for k, i in enumerate(t):
                         selection = self.__comoving_selection__(i, time, select)
                         x, ux, uz, gamma, w = \
-                            self.ts.get_particle(['x', 'ux', 'uz', 'gamma', 'w'],
+                            self.ts.get_particle([A, B, 'uz', 'gamma', 'w'],
                                                  t=i, select=selection,
                                                  species=species)
                         if properties[n] == 'ph_emit':
@@ -612,7 +639,7 @@ class Diag(object):
                 else:
                     for k, i in enumerate(t):
                         x, ux, uz, gamma, w = \
-                            self.ts.get_particle(['x', 'ux', 'uz', 'gamma', 'w'],
+                            self.ts.get_particle([A, B, 'uz', 'gamma', 'w'],
                                                  t=i, select=select,
                                                  species=species)
                         if properties[n] == 'ph_emit_n':
@@ -744,7 +771,8 @@ class Diag(object):
             List of phase space components of the phase space plot
             (Check the available components in avail_record_components)
             You can plot also the 'divergence' method outputs:
-                -'div1' is for div along planar slice x-z
+                -'div_x' is for div along planar slice x-z
+                -'div_y' is for div along planar slice y-z
                 -'div2' is for total div 
         select: dict
             Particle selector
@@ -776,8 +804,8 @@ class Diag(object):
             alpha = kwargs['alpha']
             del kwargs['alpha']
 
-        if 'div1' in components:
-            if components.index('div1') == 0:
+        if 'div_x' in components:
+            if components.index('div_x') == 0:
                 px, pz, comp2, weight = \
                     self.ts.get_particle(['ux', 'uz', components[1],'w'],iteration=iteration,
                                          select=select,species=species)
@@ -785,6 +813,17 @@ class Diag(object):
             else:
                 px, pz, comp1, weight = \
                     self.ts.get_particle(['ux', 'uz', components[0],'w'],iteration=iteration,
+                                         select=select,species=species)
+                comp2 = divergence(px=px, pz=pz)
+        elif 'div_y' in components:
+            if components.index('div_y') == 0:
+                px, pz, comp2, weight = \
+                    self.ts.get_particle(['uy', 'uz', components[1],'w'],iteration=iteration,
+                                         select=select,species=species)
+                comp1 = divergence(px=px, pz=pz)
+            else:
+                px, pz, comp1, weight = \
+                    self.ts.get_particle(['uy', 'uz', components[0],'w'],iteration=iteration,
                                          select=select,species=species)
                 comp2 = divergence(px=px, pz=pz)
         elif 'div2' in components:
