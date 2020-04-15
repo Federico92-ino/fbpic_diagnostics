@@ -105,6 +105,7 @@ def twiss(x, px, pz, w):
     alpha, beta, gamma: float
         Twiss parameters
     """
+    x *= 1.e-6    # convert in meters
     slope = divergence(px=px, pz=pz)
     emit = emittance(x, slope, w)
     sigma_x = central_average(x, w)
@@ -402,9 +403,19 @@ class Diag(object):
             B, info_b = self.ts.get_field('B', 'x', iteration=iteration, m=m, theta=theta)
             del info_b
             F = e*(E + c*B)
+        elif coord == 'r':
+            E, info_e = self.ts.get_field('E', 'r', iteration=iteration, m=m, theta=theta)
+            B, info_b = self.ts.get_field('B', 't', iteration=iteration, m=m, theta=theta)
+            del info_b
+            F = e*(E - c*B)
+        elif coord == 't':
+            E, info_e = self.ts.get_field('E', 't', iteration=iteration, m=m, theta=theta)
+            B, info_b = self.ts.get_field('B', 'r', iteration=iteration, m=m, theta=theta)
+            del info_b
+            F = e*(E + c*B)
         else:
             raise ValueError("You must specify a force component in \n"
-                             "\t\a 'x' or 'y' direction for 'coord'")
+                             "\t\a 'x', 'y', 'r' or 't' direction for 'coord'")
         return F, info_e
 
     def lineout(self, field_name, iteration,
@@ -738,7 +749,7 @@ class Diag(object):
                     else:        
                         plt.figure()
                         plt.title(p)
-                        plt.plot(Z, a)
+                        plt.plot(Z, a,**kwargs)
 
     def spectrum(self, component, iteration, select=None, species=None,
                  output=False, energy=False, charge=False, Z=1, **kwargs):
