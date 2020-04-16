@@ -88,7 +88,7 @@ def emittance(x, ux, w):
 
     return emit
 
-def twiss(x, px, pz, w):
+def twiss(x, px, pz, w, type):
 
     """
     Function to calulate the Courant-Snyder parameters 
@@ -101,23 +101,26 @@ def twiss(x, px, pz, w):
         to calculate the planar slice slope corresponding to 'x'
     w: np.array
         Weights of particles
+    type: str
+        'alpha', 'beta', or 'gamma' to select the desired twiss 
     **Returns**
-    alpha, beta, gamma: float
-        Twiss parameters
+    tw: float
+        Twiss parameter specified
     """
-    x *= 1.e-6    # convert in meters
     slope = divergence(px=px, pz=pz)
     emit = emittance(x, slope, w)
-    sigma_x = central_average(x, w)
-    sigma_slope = central_average(slope, w)
-    covariance = covar(x, slope, w)
     inv_emit = 1/emit
+    if type == 'alpha':
+        covariance = covar(x, slope, w)
+        tw = covariance*(-inv_emit)
+    elif type == 'beta':
+        sigma_x = central_average(x, w)
+        tw = sigma_x**2*inv_emit
+    elif type == 'gamma':
+        sigma_slope = central_average(slope, w)
+        tw = sigma_slope**2*inv_emit
 
-    alpha = covariance*(-inv_emit)
-    beta = sigma_x**2*inv_emit
-    gamma = sigma_slope**2*inv_emit
-
-    return alpha, beta, gamma
+    return tw
 
 def mean(x, w, energy=False):
 
@@ -674,15 +677,15 @@ class Diag(object):
                             continue
                         if p == 'tw_alpha':
                             x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x, ux, uz, w)[0]
+                            a[k] = twiss(x*1.e-6, ux, uz, w, 'alpha')
                             continue
                         if p == 'tw_beta':
                             x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x, ux, uz, w)[1]
+                            a[k] = twiss(x*1.e-6, ux, uz, w, 'beta')
                             continue
                         if p == 'tw_gamma':
                             x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x, ux, uz, w)[2]
+                            a[k] = twiss(x*1.e-6, ux, uz, w, 'gamma')
                             continue
                     if plot_over and (len(properties) == 1):
                         plt.plot(Z, a, **kwargs)
@@ -733,15 +736,15 @@ class Diag(object):
                             continue
                         if p == 'tw_alpha':
                             x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x, ux, uz, w)[0]
+                            a[k] = twiss(x*1.e-6, ux, uz, w,'alpha')
                             continue
                         if p == 'tw_beta':
                             x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x, ux, uz, w)[1]
+                            a[k] = twiss(x*1.e-6, ux, uz, w,'beta')
                             continue
                         if p == 'tw_gamma':
                             x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x, ux, uz, w)[2]
+                            a[k] = twiss(x*1.e-6, ux, uz, w,'gamma')
                             continue
 
                     if plot_over and (len(properties) == 1):
