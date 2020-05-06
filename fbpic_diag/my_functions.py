@@ -196,6 +196,63 @@ class Diag(object):
                           select['z'][1]+(v_w*(i-time))*1e6]
         return selection
 
+    def __potential__(self, iteration, theta=0, m='all'):
+        """
+        Method to integrate electrostatic potential from longitudinal field Ez.
+
+        **Parameters**
+            iteration: int
+                The same as usual
+            theta, m:
+                Same parameters of .get_field() method.
+                Same defaults (0, 'all')
+        """
+        Ez, info_e = self.ts.get_field('E', coord='z', iteration=iteration, theta=theta, m=m)
+        phi = np.zeros_like(Ez)
+        max = Ez.shape[1]
+        for i in range(max-2, -1, -1):
+            phi[:, i] = np.trapz(Ez[:, i:i+2], dx=info_e.dz) + phi[:, i+1]
+        return phi, info_e
+
+    def __force__(self, coord, iteration, theta=0, m='all'):
+        """
+        Method to calculate transverse components of force .
+
+        **Parameters**
+            coord: str
+                Which component 'x' or 'y'
+            iteration: int
+                The same as usual
+            theta, m:
+                Same parameters of .get_field() method.
+                Same defaults (0, 'all')
+        """
+
+        if coord == 'x':
+            E, info_e = self.ts.get_field('E', 'x', iteration=iteration, m=m, theta=theta)
+            B, info_b = self.ts.get_field('B', 'y', iteration=iteration, m=m, theta=theta)
+            del info_b
+            F = e*(E - c*B)
+        elif coord == 'y':
+            E, info_e = self.ts.get_field('E', 'y', iteration=iteration, m=m, theta=theta)
+            B, info_b = self.ts.get_field('B', 'x', iteration=iteration, m=m, theta=theta)
+            del info_b
+            F = e*(E + c*B)
+        elif coord == 'r':
+            E, info_e = self.ts.get_field('E', 'r', iteration=iteration, m=m, theta=theta)
+            B, info_b = self.ts.get_field('B', 't', iteration=iteration, m=m, theta=theta)
+            del info_b
+            F = e*(E - c*B)
+        elif coord == 't':
+            E, info_e = self.ts.get_field('E', 't', iteration=iteration, m=m, theta=theta)
+            B, info_b = self.ts.get_field('B', 'r', iteration=iteration, m=m, theta=theta)
+            del info_b
+            F = e*(E + c*B)
+        else:
+            raise ValueError("You must specify a force component in \n"
+                             "\t\a 'x', 'y', 'r' or 't' direction for 'coord'")
+        return F, info_e
+
     def slice_emit(self, N, select=None, species=None, iteration=None,
                    plot=False, components=['x','ux'], mask=0., trans_space='x', zeta_coord=False, **kwargs):
         """
@@ -364,63 +421,6 @@ class Diag(object):
                 plt.pcolormesh(X, Y, H, cmap=cmap[n+1], alpha=alpha,**kwargs)
         return S_prop, dz
 
-    def __potential__(self, iteration, theta=0, m='all'):
-        """
-        Method to integrate electrostatic potential from longitudinal field Ez.
-
-        **Parameters**
-            iteration: int
-                The same as usual
-            theta, m:
-                Same parameters of .get_field() method.
-                Same defaults (0, 'all')
-        """
-        Ez, info_e = self.ts.get_field('E', coord='z', iteration=iteration, theta=theta, m=m)
-        phi = np.zeros_like(Ez)
-        max = Ez.shape[1]
-        for i in range(max-2, -1, -1):
-            phi[:, i] = np.trapz(Ez[:, i:i+2], dx=info_e.dz) + phi[:, i+1]
-        return phi, info_e
-
-    def __force__(self, coord, iteration, theta=0, m='all'):
-        """
-        Method to calculate transverse components of force .
-
-        **Parameters**
-            coord: str
-                Which component 'x' or 'y'
-            iteration: int
-                The same as usual
-            theta, m:
-                Same parameters of .get_field() method.
-                Same defaults (0, 'all')
-        """
-
-        if coord == 'x':
-            E, info_e = self.ts.get_field('E', 'x', iteration=iteration, m=m, theta=theta)
-            B, info_b = self.ts.get_field('B', 'y', iteration=iteration, m=m, theta=theta)
-            del info_b
-            F = e*(E - c*B)
-        elif coord == 'y':
-            E, info_e = self.ts.get_field('E', 'y', iteration=iteration, m=m, theta=theta)
-            B, info_b = self.ts.get_field('B', 'x', iteration=iteration, m=m, theta=theta)
-            del info_b
-            F = e*(E + c*B)
-        elif coord == 'r':
-            E, info_e = self.ts.get_field('E', 'r', iteration=iteration, m=m, theta=theta)
-            B, info_b = self.ts.get_field('B', 't', iteration=iteration, m=m, theta=theta)
-            del info_b
-            F = e*(E - c*B)
-        elif coord == 't':
-            E, info_e = self.ts.get_field('E', 't', iteration=iteration, m=m, theta=theta)
-            B, info_b = self.ts.get_field('B', 'r', iteration=iteration, m=m, theta=theta)
-            del info_b
-            F = e*(E + c*B)
-        else:
-            raise ValueError("You must specify a force component in \n"
-                             "\t\a 'x', 'y', 'r' or 't' direction for 'coord'")
-        return F, info_e
-
     def lineout(self, field_name, iteration,
                 coord=None, theta=0, m='all',
                 normalize=False, A0=None, slicing='z',
@@ -548,7 +548,7 @@ class Diag(object):
         return fig, ax
 
     def bunch_properties_evolution(self, select, properties, species=None, trans_space='x',
-                                    zeta_coord=False, time=0., t_lim=False, plot_over=False,**kwargs):
+                                    zeta_coord=False, time=0., t_lim=False, plot_over=False, norm_z=1,**kwargs):
         """
         Method to select a bunch and to plot the evolution of
         its characteristics along propagation length
@@ -595,19 +595,9 @@ class Diag(object):
             plot_over: bool
                 If you want to plot all properties in the same graph
                 Default is 'False'
-            output: bool
-                If 'True' returns a dict of five np.arrays which
-                contains bunch_properties values.            
+            norm_z: float
+                Constant to normalize z-axis; set in microns            
             **kwargs: keyword to pass to .pyplot.plot()
-
-        **Returns**
-
-            prop: dictionary, if 'output' is 'True'
-                  A dict of bunch's properties values:
-                  emittance, beam size,
-                momenta spread, energy spread and beam charge
-            fig, ax: Figure, Axes
-                To handle the plot output
 
         """
         ptcl_percent = self.params['subsampling_fraction']
@@ -622,8 +612,7 @@ class Diag(object):
             B = 'uy'
         else:
             A = 'x'
-            B = 'ux'        
-
+            B = 'ux'
         for p in properties:
             if p not in self.avail_bunch_prop:
                 prop = '\n -'.join(self.avail_bunch_prop)
@@ -688,11 +677,11 @@ class Diag(object):
                             a[k] = twiss(x*1.e-6, ux, uz, w, 'gamma')
                             continue
                     if plot_over and (len(properties) == 1):
-                        plt.plot(Z, a, **kwargs)
+                        plt.plot(Z/norm_z, a, **kwargs)
                     else:        
                         plt.figure()
                         plt.title(p)
-                        plt.plot(Z, a, **kwargs)
+                        plt.plot(Z/norm_z, a, **kwargs)
 
 
                 else:
@@ -748,11 +737,11 @@ class Diag(object):
                             continue
 
                     if plot_over and (len(properties) == 1):
-                        plt.plot(Z, a, **kwargs)
+                        plt.plot(Z/norm_z, a, **kwargs)
                     else:        
                         plt.figure()
                         plt.title(p)
-                        plt.plot(Z, a,**kwargs)
+                        plt.plot(Z/norm_z, a,**kwargs)
 
     def spectrum(self, component, iteration, select=None, species=None,
                  output=False, energy=False, charge=False, Z=1, **kwargs):
