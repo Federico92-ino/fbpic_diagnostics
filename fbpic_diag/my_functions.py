@@ -421,6 +421,140 @@ class Diag(object):
                 plt.pcolormesh(X, Y, H, cmap=cmap[n+1], alpha=alpha,**kwargs)
         return S_prop, dz
 
+    def slice_analysis(self, dz, n_slice, prop, trans_space='x', species=None, select=None, norm_z=1.):
+        """
+        Function to calculate 'prop' evolution of 'n_slice' slices of width 'dz'
+
+        **Parameters**
+            dz: float
+                Width, in microns, of each slice
+            n_slice: list of floats
+                A list of floats indicating which slices are considered respect the 
+                z_mean position of selected bunch, in units of sigma_z,; z_mean is
+                calculated for each iteration, e.g:
+                    - for n_slice ranging from m to n, this function make computation for slices
+                      centered  in (z_mean + m*sigma_z), ..., (z_mean + n*sigma_z), calculating
+                      z_mean and sigma_z every iteration
+            prop: str
+                This sets which property to be calculated
+                You can choose from the following list:
+                    - ph_emit_n (normalized phase emittance)
+                    - tr_emit (trace emittance)
+                    - beam_size 
+                    - momenta_spread
+                    - charge
+                    - mean_energy
+                    - en_spread (energy spread)
+                    - tw_alpha, tw_beta, tw_gamma (Twiss parameters)
+            trans_space: str
+                'x' or 'y' transverse phase space; default is 'x'
+            select: dict or ParticleTracker object, optional
+              - If `select` is a dictionary:
+              then it lists a set of rules to select the particles, of the form
+              'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
+              'x' : [-4., 10.]   (Particles having x between -4 and 10 microns)
+              'uz' : [5., None]  (Particles with uz above 5 mc)
+              - If `select` is a ParticleTracker object:
+              then it returns particles that have been selected at another
+              iteration ; see the docstring of `ParticleTracker` for more info.
+            species: string
+                A string indicating the name of the species
+                This is optional if there is only one species
+            norm_z: float
+                Constant to normalize z-axis; set in microns 
+        **Returns**
+            Z: ndarray
+                Array of shape (len(n_slice),len(iterations)), each raw corresponding to
+                slices 
+            a: ndarray 
+                Array of prop values, each raw corrisponding to slices
+        """         
+        if prop not in self.avail_bunch_prop:
+            p = '\n -'.join(self.avail_bunch_prop)
+            raise ValueError(str(prop) + " is not an available property.\n"
+                             "Available properties are:\n -{:s}\nTry again".format(p))
+        A, B = 'x', 'ux'
+        if trans_space == 'y':
+            A = 'y'
+            B = 'uy'
+        a=np.zeros((len(n_slice),len(self.iterations)))
+        Z=np.zeros_like(a)        
+        for i,t in enumerate(self.iterations):
+            z, w = self.ts.get_particle(['z','w'], select=select, iteration=t, species=species)
+            z_mean = mean(z,w)
+            sigma_z = central_average(z,w)
+            for j,n in enumerate(n_slice):
+                if select is None:
+                    selection = {'z':[z_mean+n*sigma_z-dz/2,z_mean+n*sigma_z+dz/2]}
+                else:
+                    selection = select.copy()
+                    selection['z'] = [z_mean+n*sigma_z-dz/2,z_mean+n*sigma_z+dz/2]
+                if prop == 'beam_size':
+                    x = self.ts.get_particle([A], species=species, select=selection, iteration=t)[0]
+                    inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
+                    W = w[inds]
+                    a[j,i] = central_average(x,W)
+                    Z[j,i] = z_mean+n*sigma_z
+                    continue
+                if prop == 'momenta_spread':
+                    x = self.ts.get_particle([B], species=species, select=selection, iteration=t)[0]
+                    inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
+                    W = w[inds]
+                    a[j,i] = central_average(x,W)
+                    Z[j,i] = z_mean+n*sigma_z                
+                    continue
+                if prop == 'ph_emit_n':
+                    x, ux = self.ts.get_particle([A,B], species=species, select=selection, iteration=t)
+                    inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
+                    W = w[inds]
+                    a[j,i] = emittance(x, ux, W)
+                    Z[j,i] = z_mean+n*sigma_z
+                    continue
+                if prop == 'mean_energy':
+                    gamma = self.ts.get_particle(['gamma'], species=species, select=selection, iteration=t)[0]
+                    inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
+                    W = w[inds]
+                    a[j,i] = mean(gamma, W, energy=True)
+                    Z[j,i] = z_mean+n*sigma_z
+                    continue
+                if prop == 'en_spread':
+                    gamma = self.ts.get_particle(['gamma'], species=species, select=selection, iteration=t)[0]
+                    inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
+                    W = w[inds]
+                    a[j,i] = energy_spread(gamma,W)
+                    Z[j,i] = z_mean+n*sigma_z
+                    continue
+                if prop == 'tr_emit':
+                    x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
+                    slope = divergence(px=ux, pz=uz)
+                    inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
+                    W = w[inds]
+                    a[j,i] = emittance(x, slope, W)
+                    Z[j,i] = z_mean+n*sigma_z
+                    continue
+                if prop == 'tw_alpha':
+                    x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                    inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
+                    W = w[inds]
+                    a[j,i] = twiss(x*1.e-6, ux, uz, W, 'alpha')
+                    Z[j,i] = z_mean+n*sigma_z
+                    continue
+                if prop == 'tw_beta':
+                    x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                    inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
+                    W = w[inds]
+                    a[j,i] = twiss(x*1.e-6, ux, uz, W, 'beta')
+                    Z[j,i] = z_mean+n*sigma_z
+                    continue
+                if prop == 'tw_gamma':
+                    x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                    inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
+                    W = w[inds]                    
+                    a[j,i] = twiss(x*1.e-6, ux, uz, W, 'gamma')
+                    Z[j,i] = z_mean+n*sigma_z
+                    continue
+        return Z/norm_z, a
+
     def lineout(self, field_name, iteration,
                 coord=None, theta=0, m='all',
                 normalize=False, A0=None, slicing='z',
