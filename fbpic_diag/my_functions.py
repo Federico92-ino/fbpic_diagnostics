@@ -154,8 +154,8 @@ class Diag(object):
     plt.ion()
 
     def __init__(self, path):
-        self.ts = OpenPMDTimeSeries(path)
-        self.params = json.load(open('params.json'))
+        self.ts = OpenPMDTimeSeries(path+'/diags/hdf5')
+        self.params = json.load(open(path+'/params.json'))
         self.iterations = self.ts.iterations
         self.t = self.ts.t
         self.avail_fields = self.ts.avail_fields
