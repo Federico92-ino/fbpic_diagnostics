@@ -533,21 +533,21 @@ class Diag(object):
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'tw_alpha':
-                    x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                    x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     a[j,i] = twiss(x*1.e-6, ux, uz, W, 'alpha')
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'tw_beta':
-                    x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                    x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     a[j,i] = twiss(x*1.e-6, ux, uz, W, 'beta')
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'tw_gamma':
-                    x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                    x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]                    
                     a[j,i] = twiss(x*1.e-6, ux, uz, W, 'gamma')
