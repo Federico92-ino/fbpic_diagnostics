@@ -558,7 +558,7 @@ class Diag(object):
     def lineout(self, field_name, iteration,
                 coord=None, theta=0, m='all',
                 normalize=False, A0=None, slicing='z',
-                on_axis=None, zeta_coord=False, **kwargs):
+                on_axis=None, zeta_coord=False, norm_z=1., **kwargs):
         """
         Method to get a lineout plot of passed field_name
 
@@ -589,6 +589,8 @@ class Diag(object):
             zeta_coord: bool, optional
                     If 'True' transforms z coords into z-v_w*t coords;
                     v_w is moving window velocity. Default is 'False'
+            norm_z: float
+                    Constant to normalize z-axis; set in microns
             **kwargs: keywords to pass to .pyplot.plot() function
 
         """
@@ -620,7 +622,7 @@ class Diag(object):
         if normalize:
             E0 = self.__normalize__(field_name, coord, A0)
 
-        plt.plot(z, E/E0, **kwargs)
+        plt.plot(z/norm_z, E/E0, **kwargs)
 
     def map(self, field_name, iteration,
             coord=None, theta=0, m='all', normalize=False, A0=None, zeta_coord=False, **kwargs):
@@ -730,7 +732,7 @@ class Diag(object):
                 If you want to plot all properties in the same graph
                 Default is 'False'
             norm_z: float
-                Constant to normalize z-axis; set in microns            
+                Constant to normalize z-axis; set in microns
             **kwargs: keyword to pass to .pyplot.plot()
 
         """
