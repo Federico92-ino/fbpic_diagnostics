@@ -684,7 +684,8 @@ class Diag(object):
         return fig, ax
 
     def bunch_properties_evolution(self, select, properties, species=None, trans_space='x',
-                                    zeta_coord=False, time=0., t_lim=False, plot_over=False, norm_z=1,**kwargs):
+                                    zeta_coord=False, time=0., t_lim=False, plot_over=False,
+                                    norm_z=1, Norm=1., **kwargs):
         """
         Method to select a bunch and to plot the evolution of
         its characteristics along propagation length
@@ -733,6 +734,8 @@ class Diag(object):
                 Default is 'False'
             norm_z: float
                 Constant to normalize z-axis; set in microns
+            Norm: float
+                Constant to set properties normalization
             **kwargs: keyword to pass to .pyplot.plot()
 
         """
@@ -813,11 +816,11 @@ class Diag(object):
                             a[k] = twiss(x*1.e-6, ux, uz, w, 'gamma')
                             continue
                     if plot_over and (len(properties) == 1):
-                        plt.plot(Z/norm_z, a, **kwargs)
+                        plt.plot(Z/norm_z, a/Norm, **kwargs)
                     else:        
                         plt.figure()
                         plt.title(p)
-                        plt.plot(Z/norm_z, a, **kwargs)
+                        plt.plot(Z/norm_z, a/Norm, **kwargs)
 
 
                 else:
@@ -873,11 +876,11 @@ class Diag(object):
                             continue
 
                     if plot_over and (len(properties) == 1):
-                        plt.plot(Z/norm_z, a, **kwargs)
+                        plt.plot(Z/norm_z, a/Norm, **kwargs)
                     else:        
                         plt.figure()
                         plt.title(p)
-                        plt.plot(Z/norm_z, a,**kwargs)
+                        plt.plot(Z/norm_z, a/Norm,**kwargs)
 
     def spectrum(self, component, iteration, select=None, species=None,
                  output=False, energy=False, charge=False, Z=1, **kwargs):
