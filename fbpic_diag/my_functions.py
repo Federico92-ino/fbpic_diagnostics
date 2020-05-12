@@ -478,7 +478,8 @@ class Diag(object):
             A = 'y'
             B = 'uy'
         a=np.zeros((len(n_slice),len(self.iterations)))
-        Z=np.zeros_like(a)        
+        Z=np.zeros_like(a)
+        ptcl_percent = self.params['subsampling_fraction']
         for i,t in enumerate(self.iterations):
             z, w = self.ts.get_particle(['z','w'], select=select, iteration=t, species=species)
             z_mean = mean(z,w)
@@ -523,6 +524,17 @@ class Diag(object):
                     W = w[inds]
                     a[j,i] = energy_spread(gamma,W)
                     Z[j,i] = z_mean+n*sigma_z
+                    continue
+                if prop == 'charge':
+                    inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
+                    W = w[inds]
+                    if W.sum() == 0:
+                        a[j,i] = np.nan
+                        Z[j,i] = z_mean+n*sigma_z
+                        pass
+                    else:
+                        a[j,i] = e*W.sum()/ptcl_percent
+                        Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'tr_emit':
                     x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
