@@ -163,8 +163,8 @@ class Diag(object):
         self.avail_species = self.ts.avail_species
         self.avail_record_components = self.ts.avail_record_components
         self.avail_bunch_prop = ['ph_emit', 'ph_emit_n', 'tr_emit', 'tr_emit_n', 'beam_size',
-                                 'momenta_spread', 'charge', 'mean_energy', 'en_spread', 'tw_alpha',
-                                 'tw_beta', 'tw_gamma']
+                                 'momenta_spread', 'divergence', 'solid_div', 'charge', 'mean_energy',
+                                 'en_spread', 'tw_alpha','tw_beta', 'tw_gamma']
 
     def __normalize__(self, field_name, coord, N):
         if N is None:
@@ -442,6 +442,8 @@ class Diag(object):
                     - tr_emit (trace emittance)
                     - beam_size 
                     - momenta_spread
+                    - divergence
+                    - solid_div
                     - charge
                     - mean_energy
                     - en_spread (energy spread)
@@ -502,6 +504,22 @@ class Diag(object):
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     a[j,i] = central_average(x,W)
+                    Z[j,i] = z_mean+n*sigma_z
+                    continue
+                if prop == 'divergence':
+                    ux, uz = self.ts.get_particle([B,'uz'], species=species, select=selection, iteration=t)
+                    inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
+                    W = w[inds]
+                    slope = divergence(px=ux,pz=uz)
+                    a[j,i] = central_average(slope,W)
+                    Z[j,i] = z_mean+n*sigma_z
+                    continue
+                if prop == 'solid_div':
+                    ux, uy, uz = self.ts.get_particle(['x','uy','uz'], species=species, select=selection, iteration=t)
+                    inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
+                    W = w[inds]
+                    slope = divergence(px=ux,py=uy,pz=uz)
+                    a[j,i] = central_average(slope,W)
                     Z[j,i] = z_mean+n*sigma_z                
                     continue
                 if prop == 'ph_emit_n':
@@ -722,6 +740,8 @@ class Diag(object):
                     - tr_emit (trace emittance)
                     - beam_size 
                     - momenta_spread
+                    - divergence
+                    - solid_div
                     - charge
                     - mean_energy
                     - en_spread (energy spread)
@@ -796,6 +816,16 @@ class Diag(object):
                             ux = self.ts.get_particle([B], t=i, select=selection, species=species)[0]
                             a[k] = central_average(ux, w)
                             continue
+                        if p == 'divergence':
+                            ux, uz = self.ts.get_particle([B,'uz'], t=i, select=selection, species=species)
+                            slope = divergence(px=ux,pz=uz)
+                            a[k] = central_average(slope,w)
+                            continue
+                        if p == 'solid_div':
+                            ux, uy, uz = self.ts.get_particle(['ux','uy','uz'], t=i, select=selection, species=species)
+                            solid = divergence(ux,uy,uz)
+                            a[k] = central_average(solid,w)
+                            continue
                         if p == 'charge':
                             if w.sum() == 0:
                                 pass
@@ -854,6 +884,16 @@ class Diag(object):
                         if p == 'momenta_spread':
                             ux = self.ts.get_particle([B], t=i, select=selection, species=species)[0]
                             a[k] = central_average(ux, w)
+                            continue
+                        if p == 'divergence':
+                            ux, uz = self.ts.get_particle([B,'uz'], t=i, select=selection, species=species)
+                            slope = divergence(px=ux,pz=uz)
+                            a[k] = central_average(slope,w)
+                            continue
+                        if p == 'solid_div':
+                            ux, uy, uz = self.ts.get_particle(['ux','uy','uz'], t=i, select=selection, species=species)
+                            solid = divergence(ux,uy,uz)
+                            a[k] = central_average(solid,w)
                             continue
                         if p == 'charge':
                             if w.sum() == 0:
