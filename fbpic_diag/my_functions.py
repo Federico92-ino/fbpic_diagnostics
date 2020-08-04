@@ -162,7 +162,7 @@ class Diag(object):
         self.avail_geom = self.ts.avail_geom
         self.avail_species = self.ts.avail_species
         self.avail_record_components = self.ts.avail_record_components
-        self.avail_bunch_prop = ['ph_emit', 'ph_emit_n', 'tr_emit', 'tr_emit_n', 'beam_size',
+        self.avail_bunch_prop = ['ph_emit_n', 'tr_emit', 'beam_size',
                                  'momenta_spread', 'divergence', 'solid_div', 'charge', 'mean_energy',
                                  'en_spread', 'tw_alpha','tw_beta', 'tw_gamma']
 
@@ -579,7 +579,7 @@ class Diag(object):
                 if prop == 'tw_gamma':
                     x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
-                    W = w[inds]                    
+                    W = w[inds]
                     a[j,i] = twiss(x*1.e-6, ux, uz, W, 'gamma')
                     Z[j,i] = z_mean+n*sigma_z
                     continue
@@ -655,7 +655,7 @@ class Diag(object):
         plt.plot(z/norm_z, E/E0, **kwargs)
 
     def map(self, field_name, iteration,
-            coord=None, theta=0, m='all', normalize=False, A0=None, zeta_coord=False, **kwargs):
+            coord=None, theta=0, m='all', normalize=False, A0=None, zeta_coord=False, norm_z=1., **kwargs):
         """
         Method to get a 2D-map of passed field_name
 
@@ -681,6 +681,8 @@ class Diag(object):
                     - m_e*c*omega_p/e for longitudinal 'E'
             zeta_coord: bool;
                     If 'True' sets the co-moving frame
+            norm_z: float
+                    Constant to normalize z-axis; set in microns
             **kwargs: keywords to pass to .Axes.imshow() method
         **Return**
 
@@ -699,7 +701,6 @@ class Diag(object):
         if normalize:
             E0 = self.__normalize__(field_name, coord, A0)
 
-        fig, ax = plt.subplots(1, 1)
         origin = 'low'
         if 'origin' in kwargs:
             origin = kwargs['origin']
@@ -707,11 +708,8 @@ class Diag(object):
         extent = info_e.imshow_extent.copy()
         if zeta_coord:
             extent[0:2]-=c*self.ts.current_t
-        ax.imshow(E/E0, extent=extent*1.e6,
+        plt.imshow(E/E0, extent=extent*1.e6*norm_z,
                   origin=origin, **kwargs)
-        fig.colorbar(ax.get_images()[0], ax=ax, use_gridspec=True)
-
-        return fig, ax
 
     def bunch_properties_evolution(self, select, properties, species=None, trans_space='x',
                                     zeta_coord=False, time=0., t_lim=False, plot_over=False,
