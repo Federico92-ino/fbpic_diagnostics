@@ -39,7 +39,7 @@ def divergence(px=None, py=None, pz=None):
 
     return div
 
-def central_average(x, w):    
+def central_average(x, w):
 
     """
     Function to calculate the second order momentum of quantity x
@@ -91,7 +91,7 @@ def emittance(x, ux, w):
 def twiss(x, px, pz, w, type):
 
     """
-    Function to calulate the Courant-Snyder parameters 
+    Function to calulate the Courant-Snyder parameters
     of the bunch
     **Parameters**
     x: np.array
@@ -102,7 +102,7 @@ def twiss(x, px, pz, w, type):
     w: np.array
         Weights of particles
     type: str
-        'alpha', 'beta', or 'gamma' to select the desired twiss 
+        'alpha', 'beta', or 'gamma' to select the desired twiss
     **Returns**
     tw: float
         Twiss parameter specified
@@ -164,7 +164,7 @@ class Diag(object):
         self.avail_record_components = self.ts.avail_record_components
         self.avail_bunch_prop = ['ph_emit_n', 'tr_emit', 'beam_size',
                                  'momenta_spread', 'divergence', 'solid_div', 'charge', 'mean_energy',
-                                 'en_spread', 'tw_alpha','tw_beta', 'tw_gamma']
+                                 'en_spread', 'tw_alpha', 'tw_beta', 'tw_gamma']
 
     def __normalize__(self, field_name, coord, N):
         if N is None:
@@ -254,7 +254,8 @@ class Diag(object):
         return F, info_e
 
     def slice_emit(self, N, select=None, species=None, iteration=None,
-                   plot=False, components=['x','ux'], mask=0., trans_space='x', zeta_coord=False, **kwargs):
+                    plot=False, components=['x','ux'], mask=0., trans_space='x',
+                    z0=0., norms=[1.,1.], **kwargs):
         """
         Function to calculate slice emittances of a 'N sliced' bunch
 
@@ -285,9 +286,13 @@ class Diag(object):
                 A value to mask undesired points in plot.
             trans_space: str
                 Transverse phase space to consider in calculation: 'x' or 'y'; default is 'x'
-            zeta_coord: bool
-                If 'True' and 'z' is in 'components' the z axis has co-moving values.
-                Default is 'False'
+            z0: float
+                If 'z' is in 'components' the z axis is transformed to z+z0.
+                Default is z0=0; to be set in microns.
+            norms: list of floats
+                A list of two float constants to multiply the values of 'components' for normalization;
+                consider that positions are in microns.
+                Default is [1.,1.].
             **kwargs
                 Parameters of .pcolormesh method.
 
@@ -336,7 +341,6 @@ class Diag(object):
             bins = 1000
             density = True
             alpha = 1
-            v_w = self.params['v_window']
 
             if 'cmap' in kwargs:
                 cmap = kwargs['cmap']
@@ -353,19 +357,16 @@ class Diag(object):
             if 'alpha' in kwargs:
                 alpha = kwargs['alpha']
                 del kwargs['alpha']
-            if 'zeta_coord' in kwargs:
-                zeta_coord = kwargs['zeta_coord']
-                del kwargs['zeta_coord']
 
             if 'div_x' in components:
                 if components.index('div_x') == 0:
                     px, pz, comp2, weight = \
-                        self.ts.get_particle(['ux', 'uz', components[1],'w'], iteration=iteration,
+                        self.ts.get_particle(['ux', 'uz', components[1], 'w'], iteration=iteration,
                                              select=select, species=species)
                     comp1 = divergence(px=px, pz=pz)
                 else:
                     px, pz, comp1, weight = \
-                        self.ts.get_particle(['ux', 'uz', components[0],'w'], iteration=iteration,
+                        self.ts.get_particle(['ux', 'uz', components[0], 'w'], iteration=iteration,
                                              select=select, species=species)
                     comp2 = divergence(px=px, pz=pz)
             elif 'div_y' in components:
@@ -396,12 +397,11 @@ class Diag(object):
                                          iteration=iteration, select=select,
                                          species=species)
 
-            if 'z' in components and zeta_coord:
-                t = self.ts.current_t
+            if 'z' in components and z0:
                 if components.index('z') == 0:
-                    comp1 -= v_w*t*1.e6
+                    comp1 += z0
                 else:
-                    comp2 -= v_w*t*1.e6
+                    comp2 += z0
             comp1 = comp1[a]
             comp2 = comp2[a]
             weight = weight[a]
@@ -418,7 +418,7 @@ class Diag(object):
                 H = H.T
                 X, Y = np.meshgrid(xedge, yedge)
                 H = np.ma.masked_where(H <= mask, H)
-                plt.pcolormesh(X, Y, H, cmap=cmap[n+1], alpha=alpha,**kwargs)
+                plt.pcolormesh(X*norms[0], Y*norms[1], H, cmap=cmap[n+1], alpha=alpha,**kwargs)
         return S_prop, dz
 
     def slice_analysis(self, dz, n_slice, prop, trans_space='x', species=None, select=None, norm_z=1.):
@@ -429,7 +429,7 @@ class Diag(object):
             dz: float
                 Width, in microns, of each slice
             n_slice: list of floats
-                A list of floats indicating which slices are considered respect the 
+                A list of floats indicating which slices are considered respect the
                 z_mean position of selected bunch, in units of sigma_z,; z_mean is
                 calculated for each iteration, e.g:
                     - for n_slice ranging from m to n, this function make computation for slices
@@ -440,7 +440,7 @@ class Diag(object):
                 You can choose from the following list:
                     - ph_emit_n (normalized phase emittance)
                     - tr_emit (trace emittance)
-                    - beam_size 
+                    - beam_size
                     - momenta_spread
                     - divergence
                     - solid_div
@@ -463,7 +463,7 @@ class Diag(object):
                 A string indicating the name of the species
                 This is optional if there is only one species
             norm_z: float
-                Constant to normalize z-axis; set in microns 
+                Constant to multiply z-axis for normalization; set in microns
         **Returns**
             Z: ndarray
                 Array of shape (len(n_slice),len(iterations)), each raw corresponding to
@@ -583,12 +583,12 @@ class Diag(object):
                     a[j,i] = twiss(x*1.e-6, ux, uz, W, 'gamma')
                     Z[j,i] = z_mean+n*sigma_z
                     continue
-        return Z/norm_z, a
+        return Z*norm_z, a
 
     def lineout(self, field_name, iteration,
                 coord=None, theta=0, m='all',
                 normalize=False, A0=None, slicing='z',
-                on_axis=None, zeta_coord=False, norm_z=1., **kwargs):
+                on_axis=None, z0=0., norm_z=1., **kwargs):
         """
         Method to get a lineout plot of passed field_name
 
@@ -616,11 +616,11 @@ class Diag(object):
             on_axis: float, in microns
                     Coord in microns of slicing line along the chosen direction.
                     Default is 'r' = '0.' or 'z' = mid of the z-axis
-            zeta_coord: bool, optional
-                    If 'True' transforms z coords into z-v_w*t coords;
-                    v_w is moving window velocity. Default is 'False'
+            z0: float, optional
+                    Transforms z coords into z+z0 coords; to be set in microns.
+                    Deafult is z0=0.
             norm_z: float
-                    Constant to normalize z-axis; set in microns
+                    Constant to multiply x-axis for normalization; set in microns^-1.
             **kwargs: keywords to pass to .pyplot.plot() function
 
         """
@@ -637,10 +637,8 @@ class Diag(object):
             N = self.params['Nr'] + int(on_axis*1.e-6/info_e.dr)
             E = E[N, :]
             z = info_e.z*1.e6
-            if zeta_coord:
-                v_w = self.params['v_window']
-                t = self.ts.current_t
-                z = (info_e.z-v_w*t)*1.e6
+            if z0:
+                z = info_e.z*1e6+z0
         else:
             if on_axis is None:
                 on_axis = info_e.z[int(self.params['Nz']/2)]*1.e6
@@ -652,10 +650,11 @@ class Diag(object):
         if normalize:
             E0 = self.__normalize__(field_name, coord, A0)
 
-        plt.plot(z/norm_z, E/E0, **kwargs)
+        plt.plot(z*norm_z, E/E0, **kwargs)
 
     def map(self, field_name, iteration,
-            coord=None, theta=0, m='all', normalize=False, A0=None, zeta_coord=False, norm_z=1., **kwargs):
+            coord=None, theta=0, m='all', normalize=False, A0=None, 
+            z0=0., norms=[1.,1.], **kwargs):
         """
         Method to get a 2D-map of passed field_name
 
@@ -679,10 +678,13 @@ class Diag(object):
                       density
                     - m_e*c*omega_0/e for transverse 'E'
                     - m_e*c*omega_p/e for longitudinal 'E'
-            zeta_coord: bool;
-                    If 'True' sets the co-moving frame
-            norm_z: float
-                    Constant to normalize z-axis; set in microns
+            z0: float, optional
+                    Transforms z coords into z+z0 coords; to be set in microns.
+                    Deafult is z0=0.
+            norms: list of floats
+                A list of two float constants to multiply the values
+                of both axis for normalization; norms[0] for z-axis, norms[1] for r-axis.
+                Set in microns^-1; default is [1.,1.].
             **kwargs: keywords to pass to .Axes.imshow() method
         **Return**
 
@@ -706,9 +708,11 @@ class Diag(object):
             origin = kwargs['origin']
             del kwargs['origin']
         extent = info_e.imshow_extent.copy()
-        if zeta_coord:
-            extent[0:2]-=c*self.ts.current_t
-        plt.imshow(E/E0, extent=extent*1.e6*norm_z,
+        if z0:
+            extent[0:2]+=z0*1.e-6
+        extent[0:2]*=norms[0]
+        extent[2:4]*=norms[1]
+        plt.imshow(E/E0, extent=extent*1.e6,
                   origin=origin, **kwargs)
 
     def bunch_properties_evolution(self, select, properties, species=None, trans_space='x',
@@ -1010,7 +1014,7 @@ class Diag(object):
             return values, bins
 
     def phase_space_hist(self, species, iteration, components=['z','uz'],
-                         select=None, zeta_coord=False,
+                         select=None, z0=0., norms=[1.,1.],
                          mask=0., **kwargs):
         """
         Method that plots a 2D histogram of the particles phase space.
@@ -1031,8 +1035,13 @@ class Diag(object):
                 -'div2' is for total div 
         select: dict
             Particle selector
-        zeta_coord: bool
-            If 'True' this sets the z values in co-moving frame
+        z0: float
+            If 'z' is in 'components' the z axis is transformed to z+z0.
+            Default is z0=0; to be set in microns.
+        norms: list of floats
+            A list of two float constants to multiply the values of 'components' for normalization;
+            consider that positions are in microns.
+            Default is [1.,1.].
         mask: float, optional
             A float in [0,1] to exclude particles with <='mask' normalized
             weights values.
@@ -1041,7 +1050,6 @@ class Diag(object):
         bins = 1000
         density = True
         alpha = 1
-        v_w = self.params['v_window']
 
         if 'cmap' in kwargs:
             cmap = kwargs['cmap']
@@ -1098,12 +1106,11 @@ class Diag(object):
                                      iteration=iteration, select=select,
                                      species=species)
 
-        if 'z' in components and zeta_coord:
-            t = self.ts.current_t
+        if 'z' in components and z0:
             if components.index('z') == 0:
-                comp1 -= v_w*t*1.e6
+                comp1 += z0
             else:
-                comp2 -= v_w*t*1.e6
+                comp2 += z0
 
 
         H, xedge, yedge = \
@@ -1113,4 +1120,4 @@ class Diag(object):
         H = H.T
         X, Y = np.meshgrid(xedge, yedge)
         H = np.ma.masked_where(H <= mask, H)
-        plt.pcolormesh(X, Y, H, cmap=cmap, alpha=alpha,**kwargs)
+        plt.pcolormesh(X*norms[0], Y*norms[1], H, cmap=cmap, alpha=alpha,**kwargs)
