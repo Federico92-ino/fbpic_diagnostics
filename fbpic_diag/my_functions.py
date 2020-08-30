@@ -962,9 +962,9 @@ class Diag(object):
                 otherwise x-axis has dimensionless gamma values.
                 Default is 'False'.
             charge: bool, optional
-                If True this sets the y-axis on dQ/dE values,
+                If True this sets the y-axis on dQ/dcomp values,
                 multiplying the weights for electron charge.
-                Default is False, that means setting y-axis on dN/dE values
+                Default is False, that means setting y-axis on dN/dcomp values
             Z: int
                 The atomic number of ion; default is 1.
             **kwargs: keyword to pass to .hist() method; in kwargs['text_pos'] you can also
@@ -1014,8 +1014,8 @@ class Diag(object):
             return values, bins
 
     def phase_space_hist(self, species, iteration, components=['z','uz'],
-                         select=None, z0=0., norms=[1.,1.],
-                         mask=0., **kwargs):
+                         select=None, z0=0., norms=[1.,1.], charge=False,
+                         mask=0., Z=1., **kwargs):
         """
         Method that plots a 2D histogram of the particles phase space.
 
@@ -1042,9 +1042,15 @@ class Diag(object):
             A list of two float constants to multiply the values of 'components' for normalization;
             consider that positions are in microns.
             Default is [1.,1.].
+        charge: bool, optional
+            If True this sets the colorbar on dQ/(dcomp1*dcomp2) values,
+            multiplying the weights for electron charge.
+            Default is False, that means setting colorbar on dN/(dcomp1*dcomp2) values
         mask: float, optional
-            A float in [0,1] to exclude particles with <='mask' normalized
-            weights values.
+            A float to exclude particles with <='mask' normalized
+            weights values; if 'charge'=True its value must be in Coulomb.
+        Z: int
+            The atomic number of ion; default is 1.
         """
         cmap = 'Reds'
         bins = 1000
@@ -1112,10 +1118,15 @@ class Diag(object):
             else:
                 comp2 += z0
 
-
+        in_ptcl_percent = 1/self.params['subsampling_fraction']
+        if charge:
+            q = Z*e
+            density = False
+        else:
+            q = 1
         H, xedge, yedge = \
             np.histogram2d(comp1, comp2,
-                           bins=bins, weights=weight,
+                           bins=bins, weights=weight*in_ptcl_percent*q,
                            density=density)
         H = H.T
         X, Y = np.meshgrid(xedge, yedge)
