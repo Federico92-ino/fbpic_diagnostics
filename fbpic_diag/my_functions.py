@@ -962,8 +962,7 @@ class Diag(object):
                 otherwise x-axis has dimensionless gamma values.
                 Default is 'False'.
             charge: bool, optional
-                If True this sets the y-axis on dQ/dcomp values,
-                multiplying the weights for electron charge.
+                If True this sets the y-axis on dQ/dcomp values.
                 Default is False, that means setting y-axis on dN/dcomp values
             Z: int
                 The atomic number of ion; default is 1.
@@ -973,17 +972,35 @@ class Diag(object):
 
         **Returns**
 
-            ax: axes.Axes object to handle
+            values, bins: np.arrays
+                If 'output' is True, arrays with bins values and bins edges.
 
         """
         in_ptcl_percent = 1/self.params['subsampling_fraction']
-
-        q = 1
-        if charge:
-            q = Z*e
+        pos = [0.7, 0.7]
+        bins = 300
         comp, w = self.ts.get_particle([component, 'w'], iteration=iteration,
                                         species=species, select=select)
-        tot_charge = w.sum()*e*in_ptcl_percent
+        tot_charge = w.sum()*Z*e*in_ptcl_percent
+        q = 1/(Z*e)
+
+        if charge:
+            q = 1
+
+        if 'density' in kwargs:
+            del kwargs['density']
+
+        if 'weights' in kwargs:
+            del kwargs['weights']
+
+        if 'text_pos' in kwargs:
+            pos = kwargs['text_pos']
+            del kwargs['text_pos']
+
+        if 'bins' in kwargs:
+            bins = kwargs['bins']
+            del kwargs['bins']
+
         if (component=='gamma' and energy):
             a = 0.511        
             es = energy_spread(comp, w)
@@ -992,13 +1009,11 @@ class Diag(object):
             a = 1
             es = central_average(comp, w)
             me = mean(comp, w)
-        pos = [0.7, 0.7]
-        if 'text_pos' in kwargs:
-            pos = kwargs['text_pos']
-            del kwargs['text_pos']
 
-        values, bins, patches = plt.hist(a*comp, weights=q*in_ptcl_percent*w, **kwargs)
+        values, bins = np.histogram(a*comp, bins=bins, weights=w, density=True)
+        values, bins, patches = plt.hist(bins[:-1], bins, weights=values*q*tot_charge, **kwargs)
         del patches
+        
         fig = plt.gcf()
         if fig.texts:
             fig.texts[0].remove()
@@ -1039,18 +1054,11 @@ class Diag(object):
             If 'z' is in 'components' the z axis is transformed to z+z0.
             Default is z0=0; to be set in microns.
         norms: list of floats
-            A list of two float constants to multiply the values of 'components' for normalization;
-            consider that positions are in microns.
+            A list of two float constants to multiply the values 
+            of 'components' for normalization; consider that positions are in microns.
             Default is [1.,1.].
-        charge: bool, optional
-            If True this sets the colorbar on dQ/(dcomp1*dcomp2) values,
-            multiplying the weights for electron charge.
-            Default is False, that means setting colorbar on dN/(dcomp1*dcomp2) values
         mask: float, optional
-            A float to exclude particles with <='mask' normalized
-            weights values; if 'charge'=True its value must be in Coulomb.
-        Z: int
-            The atomic number of ion; default is 1.
+            A float to exclude particles with <='mask' normalized values.
         """
         cmap = 'Reds'
         bins = 1000
@@ -1118,15 +1126,9 @@ class Diag(object):
             else:
                 comp2 += z0
 
-        in_ptcl_percent = 1/self.params['subsampling_fraction']
-        if charge:
-            q = Z*e
-            density = False
-        else:
-            q = 1
         H, xedge, yedge = \
             np.histogram2d(comp1, comp2,
-                           bins=bins, weights=weight*in_ptcl_percent*q,
+                           bins=bins, weights=weight,
                            density=density)
         H = H.T
         X, Y = np.meshgrid(xedge, yedge)
