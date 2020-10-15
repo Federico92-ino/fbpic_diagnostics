@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from opmd_viewer import OpenPMDTimeSeries
 import json
-from scipy.constants import e, m_e, c
+from scipy.constants import e, m_e, c, pi
 
 def divergence(px=None, py=None, pz=None):
 
@@ -622,7 +622,6 @@ class Diag(object):
             norm_z: float
                     Constant to multiply x-axis for normalization; set in microns^-1.
             **kwargs: keywords to pass to .pyplot.plot() function
-
         """
         if field_name == 'phi':
             E, info_e = self.__potential__(iteration, theta=theta, m=m)
@@ -686,10 +685,6 @@ class Diag(object):
                 of both axis for normalization; norms[0] for z-axis, norms[1] for r-axis.
                 Set in microns^-1; default is [1.,1.].
             **kwargs: keywords to pass to .Axes.imshow() method
-        **Return**
-
-            ax: a matplotlib.axes.Axes instance
-
         """
         if field_name == 'phi':
             E, info_e = self.__potential__(iteration, theta=theta, m=m)
@@ -714,6 +709,91 @@ class Diag(object):
         extent[2:4]*=norms[1]
         plt.imshow(E/E0, extent=extent*1.e6,
                   origin=origin, **kwargs)
+
+    def transverse_map(self, field_name, iteration, coord=None,
+            m='all', normalize=False, A0=None,
+            z_pos=None, swap_axis=False, norms=[1.,1.], **kwargs):
+        """
+        Method to get a 2D-transverse map of passed field_name
+        in x-y  or y-x plane
+
+        **Parameters**
+
+            field_name: string
+                    Field to plot
+            coord, m: same parameters of .get_field() method.
+                         Same defaults (None, 0, 'all')
+            iteration: int
+                    The same as usual
+            normalize: bool, optional;
+                    If normalize=True this 'turns on' the normalization.
+                    Default is 'False'.
+            A0: float, optional;
+                    If normalize=True this allows to set the normalizing
+                    constant.
+                    Default is 'None: in this case normalization is set to
+                    usual units, e.g:
+                    - e*n_e for charge density 'rho'; this returns normalized
+                      density
+                    - m_e*c*omega_0/e for transverse 'E'
+                    - m_e*c*omega_p/e for longitudinal 'E'
+            z_pos: float, optional
+                    Choose the actual z-position where to slice the considered field_name;
+                    to be set in microns. Default is the first slice.
+            swap_axis: bool
+                    Whether to plot in x-y or y-x plane with inverted y-axis; default is x-y (False)
+            norms: list of floats
+                A list of two float constants to multiply the values
+                of both axis for normalization; norms[0] for h-axis, norms[1] for v-axis.
+                Set in microns^-1; default is [1.,1.].
+            **kwargs: keywords to pass to .pcolormesh() method
+        """
+        Nr = self.params['Nr']
+        test_field = self.avail_fields[0]
+        if self.ts.fields_metadata[test_field]['type'] == 'vector':
+            test_coord =  'x'
+        else:
+            test_coord = None
+        info = self.ts.get_field(test_field,test_coord,iteration=iteration)[1]
+        dz = info.dz
+        dr = info.dr
+        if z_pos == None:
+            z_pos=info.zmin*1e6
+        if z_pos < info.zmin*1e6 or z_pos > info.zmax*1e6:
+            raise ValueError('Ehi, watch out!\n'
+                              'z_pos = {:f}  cannot be less than {:f}'
+                              'or greater than {:f} microns'.format(z_pos,info.zmin*1e6,info.zmax*1e6))
+        nz = int((z_pos*1e-6-info.zmin)/dz+0.5)
+        theta = np.linspace(0,2*pi*(1+1/Nr),Nr+1)
+        r = np.insert(info.r[Nr:],0,0.)
+        field = np.zeros([Nr,Nr])
+
+        for i,T in enumerate(theta[:-1]):
+            if field_name == 'phi':
+                E = self.__potential__(iteration, theta=T, m=m)[0]
+                field[:,i] = E[Nr:,nz].copy()
+            elif field_name == 'force':
+                E = self.__force__(coord, iteration, theta=T, m=m)[0]
+                field[:,i] = E[Nr:,nz].copy()
+            else:
+                E = self.ts.get_field(field=field_name, coord=coord,
+                                          iteration=iteration, theta=T, m=m)[0]
+                field[:,i] = E[Nr:,nz].copy()
+        del E
+
+        E0 = 1
+        if normalize:
+            E0 = self.__normalize__(field_name, coord, A0)
+        field /= E0
+        Theta, R = np.meshgrid(theta,r)
+        X, Y = R*np.cos(Theta), R*np.sin(Theta)
+
+        if swap_axis:
+            plt.pcolormesh(Y*1e6,X*1e6,field,**kwargs)
+            ax=plt.gca()
+            ax.invert_xaxis()
+        else:
+            plt.pcolormesh(X*1e6,Y*1e6,field,**kwargs)
 
     def bunch_properties_evolution(self, select, properties, species=None, trans_space='x',
                                     zeta_coord=False, time=0., t_lim=False, plot_over=False,
