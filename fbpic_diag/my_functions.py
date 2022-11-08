@@ -5,7 +5,7 @@ Set of functions by FA
 # Import section
 import numpy as np
 import matplotlib.pyplot as plt
-from opmd_viewer import OpenPMDTimeSeries
+from openpmd_viewer import OpenPMDTimeSeries
 import json
 from scipy.constants import e, m_e, c, pi
 
@@ -175,7 +175,7 @@ class Diag(object):
             if field_name == 'rho':
                 N = -e*n_e
             elif field_name == 'J':
-                N = -e*n_e*c
+                N = e*n_e*c
             elif field_name == 'E':
                 if coord == 'z':
                     N = m_e*omegap*c/e
@@ -266,7 +266,7 @@ class Diag(object):
             select: dict or ParticleTracker object, optional
                 - If `select` is a dictionary:
                 then it lists a set of rules to select the particles, of the form
-                'x' : [-4., 10.]   (Particles having x between -4 and 10 microns)
+                'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
                 'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
                 'uz' : [5., None]  (Particles with uz above 5 mc)
                 - If `select` is a ParticleTracker object:
@@ -288,10 +288,10 @@ class Diag(object):
                 Transverse phase space to consider in calculation: 'x' or 'y'; default is 'x'
             z0: float
                 If 'z' is in 'components' the z axis is transformed to z+z0.
-                Default is z0=0; to be set in microns.
+                Default is z0=0; to be set in meters.
             norms: list of floats
                 A list of two float constants to multiply the values of 'components' for normalization;
-                consider that positions are in microns.
+                consider that positions are in meters.
                 Default is [1.,1.].
             **kwargs
                 Parameters of .pcolormesh method.
@@ -427,7 +427,7 @@ class Diag(object):
 
         **Parameters**
             dz: float
-                Width, in microns, of each slice
+                Width, in meters, of each slice
             n_slice: list of floats
                 A list of floats indicating which slices are considered respect the
                 z_mean position of selected bunch, in units of sigma_z,; z_mean is
@@ -454,7 +454,7 @@ class Diag(object):
               - If `select` is a dictionary:
               then it lists a set of rules to select the particles, of the form
               'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
-              'x' : [-4., 10.]   (Particles having x between -4 and 10 microns)
+              'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
               'uz' : [5., None]  (Particles with uz above 5 mc)
               - If `select` is a ParticleTracker object:
               then it returns particles that have been selected at another
@@ -463,7 +463,7 @@ class Diag(object):
                 A string indicating the name of the species
                 This is optional if there is only one species
             norm_z: float
-                Constant to multiply z-axis for normalization; set in microns
+                Constant to multiply z-axis for normalization; set in meters
         **Returns**
             Z: ndarray
                 Array of shape (len(n_slice),len(iterations)), each raw corresponding to
@@ -566,21 +566,21 @@ class Diag(object):
                     x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
-                    a[j,i] = twiss(x*1.e-6, ux, uz, W, 'alpha')
+                    a[j,i] = twiss(x, ux, uz, W, 'alpha')
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'tw_beta':
                     x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
-                    a[j,i] = twiss(x*1.e-6, ux, uz, W, 'beta')
+                    a[j,i] = twiss(x, ux, uz, W, 'beta')
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'tw_gamma':
                     x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
-                    a[j,i] = twiss(x*1.e-6, ux, uz, W, 'gamma')
+                    a[j,i] = twiss(x, ux, uz, W, 'gamma')
                     Z[j,i] = z_mean+n*sigma_z
                     continue
         return Z*norm_z, a
@@ -613,14 +613,15 @@ class Diag(object):
             slicing: str, optional
                     This sets the slicing along the chosen direction ('z' or 'r').
                     Default is 'z'.
-            on_axis: float, in microns
-                    Coord in microns of slicing line along the chosen direction.
+            on_axis: float, in meters
+                    Coord in meters of slicing line along the chosen direction.
                     Default is 'r' = '0.' or 'z' = mid of the z-axis
             z0: float, optional
-                    Transforms z coords into z+z0 coords; to be set in microns.
+                    Transforms z coords into z+z0 coords; to be set in meters.
                     Deafult is z0=0.
             norm_z: float
-                    Constant to multiply x-axis for normalization; set in microns^-1.
+                    Constant to multiply x-axis for normalization to be set in meters^-1,
+                    or changing the order of magnitude (e.g. multiply for 1.e6 to set microns).
             **kwargs: keywords to pass to .pyplot.plot() function
         """
         if field_name == 'phi':
@@ -635,15 +636,15 @@ class Diag(object):
                 on_axis = 0.
             N = self.params['Nr'] + int(on_axis*1.e-6/info_e.dr)
             E = E[N, :]
-            z = info_e.z*1.e6
+            z = info_e.z
             if z0:
-                z = info_e.z*1e6+z0
+                z = info_e.z+z0
         else:
             if on_axis is None:
-                on_axis = info_e.z[int(self.params['Nz']/2)]*1.e6
-            N = int(self.params['Nz']/2) + int((on_axis*1.e-6-info_e.z[int(self.params['Nz']/2)])/info_e.dz)
+                on_axis = info_e.z[int(self.params['Nz']/2)]
+            N = int(self.params['Nz']/2) + int((on_axis-info_e.z[int(self.params['Nz']/2)])/info_e.dz)
             E = E[:, N]
-            z = info_e.r*1.e6
+            z = info_e.r
 
         E0 = 1
         if normalize:
@@ -678,12 +679,13 @@ class Diag(object):
                     - m_e*c*omega_0/e for transverse 'E'
                     - m_e*c*omega_p/e for longitudinal 'E'
             z0: float, optional
-                    Transforms z coords into z+z0 coords; to be set in microns.
+                    Transforms z coords into z+z0 coords; to be set in meters.
                     Deafult is z0=0.
             norms: list of floats
-                A list of two float constants to multiply the values
-                of both axis for normalization; norms[0] for z-axis, norms[1] for r-axis.
-                Set in microns^-1; default is [1.,1.].
+                    A list of two float constants to multiply the values
+                    of both axis for normalization or magnitude changings; 
+                    norms[0] for z-axis, norms[1] for r-axis.
+                    Set in meters^-1; default is [1.,1.].
             **kwargs: keywords to pass to .Axes.imshow() method
         """
         if field_name == 'phi':
@@ -698,16 +700,16 @@ class Diag(object):
         if normalize:
             E0 = self.__normalize__(field_name, coord, A0)
 
-        origin = 'low'
+        origin = 'lower'
         if 'origin' in kwargs:
             origin = kwargs['origin']
             del kwargs['origin']
         extent = info_e.imshow_extent.copy()
         if z0:
-            extent[0:2]+=z0*1.e-6
+            extent[0:2]+=z0
         extent[0:2]*=norms[0]
         extent[2:4]*=norms[1]
-        plt.imshow(E/E0, extent=extent*1.e6,
+        plt.imshow(E/E0, extent=extent,
                   origin=origin, **kwargs)
 
     def transverse_map(self, field_name, iteration, coord=None,
@@ -739,13 +741,14 @@ class Diag(object):
                     - m_e*c*omega_p/e for longitudinal 'E'
             z_pos: float, optional
                     Choose the actual z-position where to slice the considered field_name;
-                    to be set in microns. Default is the first slice.
+                    to be set in meters. Default is the first slice.
             swap_axis: bool
                     Whether to plot in x-y or y-x plane with inverted y-axis; default is x-y (False)
             norms: list of floats
-                A list of two float constants to multiply the values
-                of both axis for normalization; norms[0] for h-axis, norms[1] for v-axis.
-                Set in microns^-1; default is [1.,1.].
+                    A list of two float constants to multiply the values
+                    of both axis for normalization or magnitude changings; 
+                    norms[0] for z-axis, norms[1] for r-axis.
+                    Set in meters^-1; default is [1.,1.].
             **kwargs: keywords to pass to .pcolormesh() method
         """
         Nr = self.params['Nr']
@@ -758,12 +761,12 @@ class Diag(object):
         dz = info.dz
         dr = info.dr
         if z_pos == None:
-            z_pos=info.zmin*1e6
-        if z_pos < info.zmin*1e6 or z_pos > info.zmax*1e6:
+            z_pos=info.zmin
+        if z_pos < info.zmin or z_pos > info.zmax:
             raise ValueError('Ehi, watch out!\n'
                               'z_pos = {:f}  cannot be less than {:f}'
-                              'or greater than {:f} microns'.format(z_pos,info.zmin*1e6,info.zmax*1e6))
-        nz = int((z_pos*1e-6-info.zmin)/dz+0.5)
+                              'or greater than {:f} meters'.format(z_pos,info.zmin,info.zmax))
+        nz = int((z_pos-info.zmin)/dz+0.5)
         theta = np.linspace(0,2*pi*(1+1/Nr),Nr+1)
         r = np.insert(info.r[Nr:],0,0.)
         field = np.zeros([Nr,Nr])
@@ -787,13 +790,14 @@ class Diag(object):
         field /= E0
         Theta, R = np.meshgrid(theta,r)
         X, Y = R*np.cos(Theta), R*np.sin(Theta)
-
+        X*=norms[0]
+        Y*=norms[1]
         if swap_axis:
-            plt.pcolormesh(Y*1e6,X*1e6,field,**kwargs)
+            plt.pcolormesh(Y,X,field,**kwargs)
             ax=plt.gca()
             ax.invert_xaxis()
         else:
-            plt.pcolormesh(X*1e6,Y*1e6,field,**kwargs)
+            plt.pcolormesh(X,Y,field,**kwargs)
 
     def bunch_properties_evolution(self, select, properties, species=None, trans_space='x',
                                     zeta_coord=False, time=0., t_lim=False, plot_over=False,
@@ -808,7 +812,7 @@ class Diag(object):
               - If `select` is a dictionary:
               then it lists a set of rules to select the particles, of the form
               'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
-              'x' : [-4., 10.]   (Particles having x between -4 and 10 microns)
+              'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
               'uz' : [5., None]  (Particles with uz above 5 mc)
               - If `select` is a ParticleTracker object:
               then it returns particles that have been selected at another
@@ -847,9 +851,9 @@ class Diag(object):
                 If you want to plot all properties in the same graph
                 Default is 'False'
             norm_z: float
-                Constant to normalize z-axis; set in microns
+                Multiplying constant to normalize z-axis; set in meters
             Norm: float
-                Constant to set properties normalization
+                Multiplying constant to set properties normalization
             **kwargs: keyword to pass to .pyplot.plot()
 
         """
@@ -929,23 +933,22 @@ class Diag(object):
                             continue
                         if p == 'tw_alpha':
                             x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x*1.e-6, ux, uz, w, 'alpha')
+                            a[k] = twiss(x, ux, uz, w, 'alpha')
                             continue
                         if p == 'tw_beta':
                             x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x*1.e-6, ux, uz, w, 'beta')
+                            a[k] = twiss(x, ux, uz, w, 'beta')
                             continue
                         if p == 'tw_gamma':
                             x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x*1.e-6, ux, uz, w, 'gamma')
+                            a[k] = twiss(x, ux, uz, w, 'gamma')
                             continue
                     if plot_over and (len(properties) == 1):
-                        plt.plot(Z/norm_z, a/Norm, **kwargs)
+                        plt.plot(Z*norm_z, a*Norm, **kwargs)
                     else:        
                         plt.figure()
                         plt.title(p)
-                        plt.plot(Z/norm_z, a/Norm, **kwargs)
-
+                        plt.plot(Z*norm_z, a*Norm, **kwargs)
 
                 else:
                     for k, i in enumerate(t):
@@ -998,23 +1001,23 @@ class Diag(object):
                             continue
                         if p == 'tw_alpha':
                             x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x*1.e-6, ux, uz, w,'alpha')
+                            a[k] = twiss(x, ux, uz, w,'alpha')
                             continue
                         if p == 'tw_beta':
                             x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x*1.e-6, ux, uz, w,'beta')
+                            a[k] = twiss(x, ux, uz, w,'beta')
                             continue
                         if p == 'tw_gamma':
                             x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x*1.e-6, ux, uz, w,'gamma')
+                            a[k] = twiss(x, ux, uz, w,'gamma')
                             continue
 
                     if plot_over and (len(properties) == 1):
-                        plt.plot(Z/norm_z, a/Norm, **kwargs)
+                        plt.plot(Z*norm_z, a*Norm, **kwargs)
                     else:        
                         plt.figure()
                         plt.title(p)
-                        plt.plot(Z/norm_z, a/Norm,**kwargs)
+                        plt.plot(Z*norm_z, a*Norm,**kwargs)
 
     def spectrum(self, component, iteration, select=None, species=None,
                  output=False, energy=False, charge=False, Z=1, **kwargs):
@@ -1132,10 +1135,10 @@ class Diag(object):
             Particle selector
         z0: float
             If 'z' is in 'components' the z axis is transformed to z+z0.
-            Default is z0=0; to be set in microns.
+            Default is z0=0; to be set in meters.
         norms: list of floats
             A list of two float constants to multiply the values 
-            of 'components' for normalization; consider that positions are in microns.
+            of 'components' for normalization; consider that positions are in meters.
             Default is [1.,1.].
         mask: float, optional
             A float to exclude particles with <='mask' normalized values.
