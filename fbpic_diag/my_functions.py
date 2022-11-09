@@ -1119,34 +1119,46 @@ class Diag(object):
 
         Parameters:
         ----------
-        species: str
-            Select the particle specie among the available ones
-            (Check them out in avail_species)
-        iteration: int
-            Selected iteration
-        components: list, str
-            List of phase space components of the phase space plot
-            (Check the available components in avail_record_components)
-            You can plot also the 'divergence' method outputs:
-                -'div_x' is for div along planar slice x-z
-                -'div_y' is for div along planar slice y-z
-                -'div2' is for total div 
-        select: dict
-            Particle selector
-        z0: float
-            If 'z' is in 'components' the z axis is transformed to z+z0.
-            Default is z0=0; to be set in meters.
-        norms: list of floats
-            A list of two float constants to multiply the values 
-            of 'components' for normalization; consider that positions are in meters.
-            Default is [1.,1.].
-        mask: float, optional
-            A float to exclude particles with <='mask' normalized values.
+            species: str
+                Select the particle specie among the available ones
+                (Check them out in avail_species)
+            iteration: int
+                Selected iteration
+            components: list, str
+                List of phase space components of the phase space plot
+                (Check the available components in avail_record_components)
+                You can plot also the 'divergence' method outputs:
+                    -'div_x' is for div along planar slice x-z
+                    -'div_y' is for div along planar slice y-z
+                    -'div2' is for total div
+            select: dict
+                Particle selector
+            z0: float
+                If 'z' is in 'components' the z axis is transformed to z+z0.
+                Default is z0=0; to be set in meters.
+            norms: list of floats
+                A list of two float constants to multiply the values
+                of 'components' for normalization; consider that positions are in meters.
+                Default is [1.,1.].
+            charge: bool, optional
+                If True, sets the values of histogram to dQ/dc1dc2, otherwise dN/dc1dc2.
+                Default is False.
+            mask: float, optional
+                A float in [0.,1.] to mask all bins with a value <= mask*max(hist_values).
+            Z: float, optional
+                Atomic number of the ion, default is 1.
+            **kwargs:
+                keywords passing to plt.pcolormesh(); in **kwargs can also be set 'density'
+                to pass to np.histogram2d(); if True it plots the particle (charge, whenever
+                'charge'=True) density in the 2D-phase space, if False the histogram values
+                count for number of particles in bins (i.e. hist_values.sum() = weight.sum()).
+                Default is True.
         """
         cmap = 'Reds'
         bins = 1000
         density = True
         alpha = 1
+        q = 1
 
         if 'cmap' in kwargs:
             cmap = kwargs['cmap']
@@ -1163,6 +1175,9 @@ class Diag(object):
         if 'alpha' in kwargs:
             alpha = kwargs['alpha']
             del kwargs['alpha']
+
+        if charge:
+            q = Z*e
 
         if 'div_x' in components:
             if components.index('div_x') == 0:
@@ -1209,11 +1224,13 @@ class Diag(object):
             else:
                 comp2 += z0
 
+        if mask > 1.:
+            raise ValueError("mask = {:f} can't be greater than 1.".format(mask))
+
         H, xedge, yedge = \
-            np.histogram2d(comp1, comp2,
+            np.histogram2d(comp1*norms[0], comp2*norms[1],
                            bins=bins, weights=weight,
                            density=density)
-        H = H.T
-        X, Y = np.meshgrid(xedge, yedge)
-        H = np.ma.masked_where(H <= mask, H)
-        plt.pcolormesh(X*norms[0], Y*norms[1], H, cmap=cmap, alpha=alpha,**kwargs)
+        H = H.T*q*weight.sum()
+        H = np.ma.masked_less_equal(H,mask*H.max())
+        plt.pcolormesh(xedge, yedge, H, cmap=cmap, alpha=alpha,**kwargs)
