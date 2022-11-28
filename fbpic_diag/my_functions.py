@@ -634,7 +634,7 @@ class Diag(object):
         if slicing == 'z':
             if on_axis is None:
                 on_axis = 0.
-            N = self.params['Nr'] + int(on_axis*1.e-6/info_e.dr)
+            N = self.params['Nr'] + int(on_axis/info_e.dr)
             E = E[N, :]
             z = info_e.z
             if z0:
@@ -936,7 +936,7 @@ class Diag(object):
                         continue
                     elif property in ['tw_alpha','tw_beta','tw_gamma']:
                         x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                        a[k] = twiss(x, ux, uz, w, property)
+                        a[k] = twiss(x, ux, uz, w, property.remove('tw_',''))
             else:
                 for k, i in enumerate(t):
                     selection = select
@@ -988,7 +988,7 @@ class Diag(object):
                         continue
                     elif property in ['tw_alpha','tw_beta','tw_gamma']:
                         x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                        a[k] = twiss(x, ux, uz, w, property)
+                        a[k] = twiss(x, ux, uz, w, property.remove('tw_',''))
             if output:
                 return Z, a
             if plot:
@@ -1081,8 +1081,8 @@ class Diag(object):
                                         "Energy spread is {:3.1f} %".format(Z*e*tot_ptcl, me, es*100))
         else:
             plt.figtext(pos[0], pos[1], "Total charge is {:.1e}C\n"
-                                        "Mean is {:.2f}\n"
-                                        "Standar deviation is {:.1f}".format(Z*e*tot_ptcl,me,es))
+                                        "Mean is {:.2e}\n"
+                                        "Standar deviation is {:.1e}".format(Z*e*tot_ptcl,me,es))
         if output:
             return values, bins
 
