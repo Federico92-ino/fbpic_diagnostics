@@ -799,8 +799,8 @@ class Diag(object):
         else:
             plt.pcolormesh(X,Y,field,**kwargs)
 
-    def bunch_properties_evolution(self, select, properties, species=None, trans_space='x',
-                                    zeta_coord=False, time=0., t_lim=False, plot_over=False,
+    def bunch_properties_evolution(self, select, property, species=None, trans_space='x',
+                                    zeta_coord=False, time=0., t_lim=False, output=True, plot=False,
                                     norm_z=1, Norm=1., **kwargs):
         """
         Method to select a bunch and to plot the evolution of
@@ -819,8 +819,8 @@ class Diag(object):
               iteration ; see the docstring of `ParticleTracker` for more info.
               - If 'select' contains 'z' and 'zeta_coord'='True':
               selection is made in co-moving frame
-            properties: list of str
-                This sets which properties will be plotted in order you set the list.
+            property: str
+                This sets which property will be plotted.
                 You can choose from the following list:
                     - ph_emit_n (normalized phase emittance)
                     - tr_emit (trace emittance)
@@ -833,27 +833,30 @@ class Diag(object):
                     - en_spread (energy spread)
                     - tw_alpha, tw_beta, tw_gamma (Twiss parameters)
             species: string
-                A string indicating the name of the species
-                This is optional if there is only one species
+                A string indicating the name of the species.
+                This is optional if there is only one species.
             trans_space: str
                 'x' or 'y' transverse phase space; default is 'x'
             zeta_coord: bool
                 If 'True'and 'z' in 'select', the 'z' selection
-                is done in co-moving frame
+                is done in co-moving frame.
             time: float
                 Specify the time (s) at which refers the 'z' selection
                 when activated the co-moving frame.
                 Default is the first iteration.
             t_lim: list of two floats 
-                Set the time window you want to plot
-                Use self.t values as limits (s); default is all time_series
-            plot_over: bool
-                If you want to plot all properties in the same graph
-                Default is 'False'
+                Set the time window you want to plot.
+                Use self.t values as limits (s); default is all time_series.
+            output: bool
+                If True, it returns two arrays with Z mean positions of the bunch
+                during the propagation and the values of property.
+                Default is True.
+            plot: bool
+                If you want to plot. Default is 'False'.
             norm_z: float
-                Multiplying constant to normalize z-axis; set in meters
+                Multiplying constant to normalize z-axis; set in meters.
             Norm: float
-                Multiplying constant to set properties normalization
+                Multiplying constant to set properties normalization.
             **kwargs: keyword to pass to .pyplot.plot()
 
         """
@@ -870,154 +873,126 @@ class Diag(object):
         else:
             A = 'x'
             B = 'ux'
-        for p in properties:
-            if p not in self.avail_bunch_prop:
-                prop = '\n -'.join(self.avail_bunch_prop)
-                print(str(p) + " is not an available property.\n"
-                                 "Available properties are:\n -{:s}\nTry again".format(prop))
-            else:
-                if zeta_coord and ('z' in select):
-                    
-                    if time != 0.:
-                        time = time
-                    else:
-                        time = self.t[0]
-                                        
-                    for k, i in enumerate(t):
-                        selection = self.__comoving_selection__(i, time, select)
-                        z, w = self.ts.get_particle(['z', 'w'],
-                                                 t=i, select=selection,
-                                                 species=species)
-                        Z[k] = mean(z,w)
-                        if p == 'ph_emit_n':
-                            x, ux = self.ts.get_particle([A, B],t=i,
-                                    select=selection,species=species)                        
-                            a[k] = emittance(x, ux, w)
-                            continue
-                        if p == 'beam_size':
-                            x = self.ts.get_particle([A], t=i, select=selection, species=species)[0]
-                            a[k] = central_average(x, w)
-                            continue
-                        if p == 'momenta_spread':
-                            ux = self.ts.get_particle([B], t=i, select=selection, species=species)[0]
-                            a[k] = central_average(ux, w)
-                            continue
-                        if p == 'divergence':
-                            ux, uz = self.ts.get_particle([B,'uz'], t=i, select=selection, species=species)
-                            slope = divergence(px=ux,pz=uz)
-                            a[k] = central_average(slope,w)
-                            continue
-                        if p == 'solid_div':
-                            ux, uy, uz = self.ts.get_particle(['ux','uy','uz'], t=i, select=selection, species=species)
-                            solid = divergence(ux,uy,uz)
-                            a[k] = central_average(solid,w)
-                            continue
-                        if p == 'charge':
-                            if w.sum() == 0:
-                                pass
-                            else:
-                                a[k] = e*w.sum()/ptcl_percent
-                            continue
-                        if p == 'mean_energy':
-                            gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
-                            a[k] = mean(gamma,w,energy=True)
-                            continue
-                        if p == 'en_spread':
-                            gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
-                            a[k] = energy_spread(gamma, w)
-                            continue
-                        if p == 'tr_emit':
-                            x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            slope = divergence(px=ux, pz=uz)
-                            a[k] = emittance(x, slope, w)
-                            continue
-                        if p == 'tw_alpha':
-                            x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x, ux, uz, w, 'alpha')
-                            continue
-                        if p == 'tw_beta':
-                            x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x, ux, uz, w, 'beta')
-                            continue
-                        if p == 'tw_gamma':
-                            x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x, ux, uz, w, 'gamma')
-                            continue
-                    if plot_over and (len(properties) == 1):
-                        plt.plot(Z*norm_z, a*Norm, **kwargs)
-                    else:        
-                        plt.figure()
-                        plt.title(p)
-                        plt.plot(Z*norm_z, a*Norm, **kwargs)
+        
+        if property not in self.avail_bunch_prop:
+            prop = '\n -'.join(self.avail_bunch_prop)
+            raise ValueError(str(property) + " is not an available property.\n"
+                             "Available properties are:\n -{:s}\nTry again".format(prop))
+        else:
+            if zeta_coord and ('z' in select):
 
+                if time != 0.:
+                    time = time
                 else:
-                    for k, i in enumerate(t):
-                        selection = select
-                        z, w = self.ts.get_particle(['z', 'w'],
-                         t=i, select=selection,
-                         species=species)
-                        Z[k] = mean(z,w)
-                        if p == 'ph_emit_n':
-                            x, ux = self.ts.get_particle([A, B],t=i,
-                                    select=selection,species=species)                        
-                            a[k] = emittance(x, ux, w)
-                            continue
-                        if p == 'beam_size':
-                            x = self.ts.get_particle([A], t=i, select=selection, species=species)[0]
-                            a[k] = central_average(x, w)
-                            continue
-                        if p == 'momenta_spread':
-                            ux = self.ts.get_particle([B], t=i, select=selection, species=species)[0]
-                            a[k] = central_average(ux, w)
-                            continue
-                        if p == 'divergence':
-                            ux, uz = self.ts.get_particle([B,'uz'], t=i, select=selection, species=species)
-                            slope = divergence(px=ux,pz=uz)
-                            a[k] = central_average(slope,w)
-                            continue
-                        if p == 'solid_div':
-                            ux, uy, uz = self.ts.get_particle(['ux','uy','uz'], t=i, select=selection, species=species)
-                            solid = divergence(ux,uy,uz)
-                            a[k] = central_average(solid,w)
-                            continue
-                        if p == 'charge':
-                            if w.sum() == 0:
-                                pass
-                            else:
-                                a[k] = e*w.sum()/ptcl_percent
-                            continue
-                        if p == 'mean_energy':
-                            gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
-                            a[k] = mean(gamma,w,energy=True)
-                            continue
-                        if p == 'en_spread':
-                            gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
-                            a[k] = energy_spread(gamma, w)
-                            continue
-                        if p == 'tr_emit':
-                            x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            slope = divergence(px=ux, pz=uz)
-                            a[k] = emittance(x, slope, w)
-                            continue
-                        if p == 'tw_alpha':
-                            x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x, ux, uz, w,'alpha')
-                            continue
-                        if p == 'tw_beta':
-                            x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x, ux, uz, w,'beta')
-                            continue
-                        if p == 'tw_gamma':
-                            x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
-                            a[k] = twiss(x, ux, uz, w,'gamma')
-                            continue
+                    time = self.t[0]
 
-                    if plot_over and (len(properties) == 1):
-                        plt.plot(Z*norm_z, a*Norm, **kwargs)
-                    else:        
-                        plt.figure()
-                        plt.title(p)
-                        plt.plot(Z*norm_z, a*Norm,**kwargs)
+                for k, i in enumerate(t):
+                    selection = self.__comoving_selection__(i, time, select)
+                    z, w = self.ts.get_particle(['z', 'w'],
+                                             t=i, select=selection,
+                                             species=species)
+                    Z[k] = mean(z,w)
+                    if property == 'ph_emit_n':
+                        x, ux = self.ts.get_particle([A, B],t=i,
+                                select=selection,species=species)                        
+                        a[k] = emittance(x, ux, w)
+                        continue
+                    elif property == 'beam_size':
+                        x = self.ts.get_particle([A], t=i, select=selection, species=species)[0]
+                        a[k] = central_average(x, w)
+                        continue
+                    elif property == 'momenta_spread':
+                        ux = self.ts.get_particle([B], t=i, select=selection, species=species)[0]
+                        a[k] = central_average(ux, w)
+                        continue
+                    elif property == 'divergence':
+                        ux, uz = self.ts.get_particle([B,'uz'], t=i, select=selection, species=species)
+                        slope = divergence(px=ux,pz=uz)
+                        a[k] = central_average(slope,w)
+                        continue
+                    elif property == 'solid_div':
+                        ux, uy, uz = self.ts.get_particle(['ux','uy','uz'], t=i, select=selection, species=species)
+                        solid = divergence(ux,uy,uz)
+                        a[k] = central_average(solid,w)
+                        continue
+                    elif property == 'charge':
+                        if w.sum() == 0:
+                            pass
+                        else:
+                            a[k] = e*w.sum()/ptcl_percent
+                        continue
+                    elif property == 'mean_energy':
+                        gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
+                        a[k] = mean(gamma,w,energy=True)
+                        continue
+                    elif property == 'en_spread':
+                        gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
+                        a[k] = energy_spread(gamma, w)
+                        continue
+                    elif property == 'tr_emit':
+                        x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                        slope = divergence(px=ux, pz=uz)
+                        a[k] = emittance(x, slope, w)
+                        continue
+                    elif property in ['tw_alpha','tw_beta','tw_gamma']:
+                        x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                        a[k] = twiss(x, ux, uz, w, property)
+            else:
+                for k, i in enumerate(t):
+                    selection = select
+                    z, w = self.ts.get_particle(['z', 'w'],
+                     t=i, select=selection,
+                     species=species)
+                    Z[k] = mean(z,w)
+                    if property == 'ph_emit_n':
+                        x, ux = self.ts.get_particle([A, B],t=i,
+                                select=selection,species=species)                        
+                        a[k] = emittance(x, ux, w)
+                        continue
+                    elif property == 'beam_size':
+                        x = self.ts.get_particle([A], t=i, select=selection, species=species)[0]
+                        a[k] = central_average(x, w)
+                        continue
+                    elif property == 'momenta_spread':
+                        ux = self.ts.get_particle([B], t=i, select=selection, species=species)[0]
+                        a[k] = central_average(ux, w)
+                        continue
+                    elif property == 'divergence':
+                        ux, uz = self.ts.get_particle([B,'uz'], t=i, select=selection, species=species)
+                        slope = divergence(px=ux,pz=uz)
+                        a[k] = central_average(slope,w)
+                        continue
+                    elif property == 'solid_div':
+                        ux, uy, uz = self.ts.get_particle(['ux','uy','uz'], t=i, select=selection, species=species)
+                        solid = divergence(ux,uy,uz)
+                        a[k] = central_average(solid,w)
+                        continue
+                    elif property == 'charge':
+                        if w.sum() == 0:
+                            pass
+                        else:
+                            a[k] = e*w.sum()/ptcl_percent
+                        continue
+                    elif property == 'mean_energy':
+                        gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
+                        a[k] = mean(gamma,w,energy=True)
+                        continue
+                    elif property == 'en_spread':
+                        gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
+                        a[k] = energy_spread(gamma, w)
+                        continue
+                    elif property == 'tr_emit':
+                        x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                        slope = divergence(px=ux, pz=uz)
+                        a[k] = emittance(x, slope, w)
+                        continue
+                    elif property in ['tw_alpha','tw_beta','tw_gamma']:
+                        x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                        a[k] = twiss(x, ux, uz, w, property)
+            if output:
+                return Z, a
+            if plot:
+                plt.plot(Z*norm_z, a*Norm, **kwargs)
 
     def spectrum(self, component, iteration, select=None, species=None,
                  output=False, energy=False, charge=False, Z=1, **kwargs):
@@ -1064,11 +1039,11 @@ class Diag(object):
         bins = 300
         comp, w = self.ts.get_particle([component, 'w'], iteration=iteration,
                                         species=species, select=select)
-        tot_charge = w.sum()*Z*e*in_ptcl_percent
-        q = 1/(Z*e)
+        tot_ptcl = w.sum()*in_ptcl_percent
+        q = 1
 
         if charge:
-            q = 1
+            q = Z*e
 
         if 'density' in kwargs:
             del kwargs['density']
@@ -1094,7 +1069,7 @@ class Diag(object):
             me = mean(comp, w)
 
         values, bins = np.histogram(a*comp, bins=bins, weights=w, density=True)
-        values, bins, patches = plt.hist(bins[:-1], bins, weights=values*q*tot_charge, **kwargs)
+        values, bins, patches = plt.hist(bins[:-1], bins, weights=values*q*tot_ptcl, **kwargs)
         del patches
         
         fig = plt.gcf()
@@ -1103,17 +1078,17 @@ class Diag(object):
         if (component=='gamma' and energy):
             plt.figtext(pos[0], pos[1], "Total charge is {:.1e} C\n"
                                         "Mean energy is {:.2f} MeV\n"
-                                        "Energy spread is {:3.1f} %".format(tot_charge, me, es*100))
+                                        "Energy spread is {:3.1f} %".format(Z*e*tot_ptcl, me, es*100))
         else:
             plt.figtext(pos[0], pos[1], "Total charge is {:.1e}C\n"
                                         "Mean is {:.2f}\n"
-                                        "Standar deviation is {:.1f}".format(tot_charge,me,es))
+                                        "Standar deviation is {:.1f}".format(Z*e*tot_ptcl,me,es))
         if output:
             return values, bins
 
     def phase_space_hist(self, species, iteration, components=['z','uz'],
                          select=None, z0=0., norms=[1.,1.], charge=False,
-                         mask=0., Z=1., **kwargs):
+                         mask=0., Z=1, **kwargs):
         """
         Method that plots a 2D histogram of the particles phase space.
 
@@ -1148,15 +1123,12 @@ class Diag(object):
             Z: float, optional
                 Atomic number of the ion, default is 1.
             **kwargs:
-                keywords passing to plt.pcolormesh(); in **kwargs can also be set 'density'
-                to pass to np.histogram2d(); if True it plots the particle (charge, whenever
-                'charge'=True) density in the 2D-phase space, if False the histogram values
-                count for number of particles in bins (i.e. hist_values.sum() = weight.sum()).
-                Default is True.
+                keywords passing to plt.pcolormesh().
         """
+
+        in_ptcl_percent = 1/self.params['subsampling_fraction']
         cmap = 'Reds'
         bins = 1000
-        density = True
         alpha = 1
         q = 1
 
@@ -1167,10 +1139,6 @@ class Diag(object):
         if 'bins' in kwargs:
             bins = kwargs['bins']
             del kwargs['bins']
-
-        if 'density' in kwargs:
-            density = kwargs['density']
-            del kwargs['density']
 
         if 'alpha' in kwargs:
             alpha = kwargs['alpha']
@@ -1230,7 +1198,7 @@ class Diag(object):
         H, xedge, yedge = \
             np.histogram2d(comp1*norms[0], comp2*norms[1],
                            bins=bins, weights=weight,
-                           density=density)
-        H = H.T*q*weight.sum()
+                           density=True)
+        H = H.T*q*weight.sum()*in_ptcl_percent
         H = np.ma.masked_less_equal(H,mask*H.max())
         plt.pcolormesh(xedge, yedge, H, cmap=cmap, alpha=alpha,**kwargs)
