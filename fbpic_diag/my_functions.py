@@ -172,8 +172,8 @@ class Diag(object):
             omega0 = self.params['omega0']
             omegap = self.params['omegap']
 
-            if field_name == 'rho':
-                N = -e*n_e
+            if field_name.startswith('rho_'):
+                N = e*n_e
             elif field_name == 'J':
                 N = e*n_e*c
             elif field_name == 'E':
@@ -860,19 +860,23 @@ class Diag(object):
             **kwargs: keyword to pass to .pyplot.plot()
 
         """
-        ptcl_percent = self.params['subsampling_fraction']
+        inv_ptcl_percent = 1/self.params['subsampling_fraction']
         if not t_lim:
             t_lim = [self.t.min(), self.t.max()]
         inds = np.where((self.t >= t_lim[0]) & (self.t <= t_lim[1]))
         t = self.t[inds]
         a = np.zeros_like(t)
         Z = np.zeros_like(t)
+
         if trans_space == 'y':
             A = 'y'
             B = 'uy'
         else:
             A = 'x'
             B = 'ux'
+
+        if property == 'charge':
+            q = self.ts.get_particle(['charge'], t=t[-1], select=selection, species=species)[0]
         
         if property not in self.avail_bunch_prop:
             prop = '\n -'.join(self.avail_bunch_prop)
@@ -919,7 +923,7 @@ class Diag(object):
                         if w.sum() == 0:
                             pass
                         else:
-                            a[k] = e*w.sum()/ptcl_percent
+                            a[k] = q*w.sum()*inv_ptcl_percent
                         continue
                     elif property == 'mean_energy':
                         gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
@@ -971,7 +975,7 @@ class Diag(object):
                         if w.sum() == 0:
                             pass
                         else:
-                            a[k] = e*w.sum()/ptcl_percent
+                            a[k] = q*w.sum()*inv_ptcl_percent
                         continue
                     elif property == 'mean_energy':
                         gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
@@ -995,16 +999,17 @@ class Diag(object):
                 plt.plot(Z*norm_z, a*Norm, **kwargs)
 
     def spectrum(self, component, iteration, select=None, species=None,
-                 output=False, energy=False, charge=False, Z=1, **kwargs):
+                norm_z =1., output=False, charge=False, **kwargs):
         """
         Method to easily get an energy spectrum of 'selected' particles
 
         **Parameters**
 
-            
             component: str
                 Choose a component in .avail_recorded_components
-                to do the weighted distibution of that quantity
+                to do the weighted distibution of that quantity;
+                if 'current', it returns the longitudinal current (in A)
+                carried by the specific 'species' versus 'z'. 
             iteration: int
                 Which iteration we need
             select: dictionary or ParticleTracker instance
@@ -1015,18 +1020,13 @@ class Diag(object):
                 If 'True' returns the values of histogram and bins
                 edges; length of bins array is nbins+1 
                 (lefts edges and right edge of the last bin).
-            energy: bool, optional
-                If 'True' this sets the x-axis on energy(MeV),
-                otherwise x-axis has dimensionless gamma values.
-                Default is 'False'.
+            norm_z: float, optional
+                A constant to multiply the x-axis.
             charge: bool, optional
-                If True this sets the y-axis on dQ/dcomp values.
+                If True this sets the y-axis on dQ/dcomp values, except in case
+                component is 'current'.
                 Default is False, that means setting y-axis on dN/dcomp values
-            Z: int
-                The atomic number of ion; default is 1.
-            **kwargs: keyword to pass to .hist() method; in kwargs['text_pos'] you can also
-                    set the position of text inset in 'figure' frame [(0.,1.),(0.,1.)].
-                    Default is [0.7,0.7].
+            **kwargs: keyword to pass to .hist() method.
 
         **Returns**
 
@@ -1035,15 +1035,7 @@ class Diag(object):
 
         """
         in_ptcl_percent = 1/self.params['subsampling_fraction']
-        pos = [0.7, 0.7]
         bins = 300
-        comp, w = self.ts.get_particle([component, 'w'], iteration=iteration,
-                                        species=species, select=select)
-        tot_ptcl = w.sum()*in_ptcl_percent
-        q = 1
-
-        if charge:
-            q = Z*e
 
         if 'density' in kwargs:
             del kwargs['density']
@@ -1059,36 +1051,30 @@ class Diag(object):
             bins = kwargs['bins']
             del kwargs['bins']
 
-        if (component=='gamma' and energy):
-            a = 0.511        
-            es = energy_spread(comp, w)
-            me = mean(comp, w, energy=True)
-        else:
-            a = 1
-            es = central_average(comp, w)
-            me = mean(comp, w)
+        if component == 'current':
+            z, uz, gamma, q, w = self.ts.get_particle(['z','uz','gamma','charge','w'], iteration=iteration,
+                                                    species=species, select=select)
+            vz = c*uz/gamma
+            values, bin = np.histogram(norm_z*z, bins=bins, weights=q*vz*w)
+            q = 1
+            N_tot = 1
+        else:    
+            comp, q, w = self.ts.get_particle([component, 'charge', 'w'], iteration=iteration,
+                                        species=species, select=select)
+            values, bin = np.histogram(norm_z*comp, bins=bins, weights=w, density=True)
+            N_tot = w.sum()*in_ptcl_percent
+            if not charge:
+                q = 1
 
-        values, bins = np.histogram(a*comp, bins=bins, weights=w, density=True)
-        values, bins, patches = plt.hist(bins[:-1], bins, weights=values*q*tot_ptcl, **kwargs)
+        values, bin, patches = plt.hist(bin[:-1], bin, weights=values*q*N_tot, **kwargs)
         del patches
-        
-        fig = plt.gcf()
-        if fig.texts:
-            fig.texts[0].remove()
-        if (component=='gamma' and energy):
-            plt.figtext(pos[0], pos[1], "Total charge is {:.1e} C\n"
-                                        "Mean energy is {:.2f} MeV\n"
-                                        "Energy spread is {:3.1f} %".format(Z*e*tot_ptcl, me, es*100))
-        else:
-            plt.figtext(pos[0], pos[1], "Total charge is {:.1e}C\n"
-                                        "Mean is {:.2e}\n"
-                                        "Standar deviation is {:.1e}".format(Z*e*tot_ptcl,me,es))
+
         if output:
-            return values, bins
+            return values, bin
 
     def phase_space_hist(self, species, iteration, components=['z','uz'],
                          select=None, z0=0., norms=[1.,1.], charge=False,
-                         mask=0., Z=1, **kwargs):
+                         mask=0., **kwargs):
         """
         Method that plots a 2D histogram of the particles phase space.
 
@@ -1120,17 +1106,18 @@ class Diag(object):
                 Default is False.
             mask: float, optional
                 A float in [0.,1.] to mask all bins with a value <= mask*max(hist_values).
-            Z: float, optional
-                Atomic number of the ion, default is 1.
             **kwargs:
                 keywords passing to plt.pcolormesh().
         """
 
-        in_ptcl_percent = 1/self.params['subsampling_fraction']
+        inv_ptcl_percent = 1/self.params['subsampling_fraction']
         cmap = 'Reds'
         bins = 1000
         alpha = 1
-        q = 1
+
+        q, weight = self.ts.get_particle(['charge', 'w'],iteration=iteration,
+                                         select=select,species=species)
+        N_tot = weight.sum()*inv_ptcl_percent
 
         if 'cmap' in kwargs:
             cmap = kwargs['cmap']
@@ -1144,45 +1131,45 @@ class Diag(object):
             alpha = kwargs['alpha']
             del kwargs['alpha']
 
-        if charge:
-            q = Z*e
+        if not charge:
+            q = 1
 
         if 'div_x' in components:
             if components.index('div_x') == 0:
-                px, pz, comp2, weight = \
-                    self.ts.get_particle(['ux', 'uz', components[1],'w'],iteration=iteration,
+                px, pz, comp2 = \
+                    self.ts.get_particle(['ux', 'uz', components[1]],iteration=iteration,
                                          select=select,species=species)
                 comp1 = divergence(px=px, pz=pz)
             else:
-                px, pz, comp1, weight = \
-                    self.ts.get_particle(['ux', 'uz', components[0],'w'],iteration=iteration,
+                px, pz, comp1 = \
+                    self.ts.get_particle(['ux', 'uz', components[0]],iteration=iteration,
                                          select=select,species=species)
                 comp2 = divergence(px=px, pz=pz)
         elif 'div_y' in components:
             if components.index('div_y') == 0:
-                px, pz, comp2, weight = \
-                    self.ts.get_particle(['uy', 'uz', components[1],'w'],iteration=iteration,
+                px, pz, comp2 = \
+                    self.ts.get_particle(['uy', 'uz', components[1]],iteration=iteration,
                                          select=select,species=species)
                 comp1 = divergence(px=px, pz=pz)
             else:
-                px, pz, comp1, weight = \
-                    self.ts.get_particle(['uy', 'uz', components[0],'w'],iteration=iteration,
+                px, pz, comp1 = \
+                    self.ts.get_particle(['uy', 'uz', components[0]],iteration=iteration,
                                          select=select,species=species)
                 comp2 = divergence(px=px, pz=pz)
         elif 'div2' in components:
             if components.index('div2') == 0:
-                px, py, pz, comp2, weight = \
-                    self.ts.get_particle(['ux', 'uy', 'uz', components[1],'w'],iteration=iteration,
+                px, py, pz, comp2 = \
+                    self.ts.get_particle(['ux', 'uy', 'uz', components[1]],iteration=iteration,
                                          select=select,species=species)
                 comp1 = divergence(px=px, py=py, pz=pz)
             else:
-                px, py, pz, comp1, weight = \
-                    self.ts.get_particle(['ux', 'uy', 'uz', components[0],'w'],iteration=iteration,
+                px, py, pz, comp1 = \
+                    self.ts.get_particle(['ux', 'uy', 'uz', components[0]],iteration=iteration,
                                          select=select,species=species)
                 comp2 = divergence(px=px, py=py, pz=pz)
         else:
-            comp1, comp2, weight = \
-                self.ts.get_particle([components[0], components[1], 'w'],
+            comp1, comp2 = \
+                self.ts.get_particle([components[0], components[1]],
                                      iteration=iteration, select=select,
                                      species=species)
 
@@ -1199,6 +1186,6 @@ class Diag(object):
             np.histogram2d(comp1*norms[0], comp2*norms[1],
                            bins=bins, weights=weight,
                            density=True)
-        H = H.T*q*weight.sum()*in_ptcl_percent
+        H = H.T*q*N_tot
         H = np.ma.masked_less_equal(H,mask*H.max())
         plt.pcolormesh(xedge, yedge, H, cmap=cmap, alpha=alpha,**kwargs)
