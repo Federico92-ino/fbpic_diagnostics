@@ -172,7 +172,7 @@ class Diag(object):
             omega0 = self.params['omega0']
             omegap = self.params['omegap']
 
-            if field_name.startswith('rho_'):
+            if field_name.startswith('rho_') or field_name == 'rho':
                 N = e*n_e
             elif field_name == 'J':
                 N = e*n_e*c
@@ -1051,24 +1051,24 @@ class Diag(object):
             z, uz, gamma, q, w = self.ts.get_particle(['z','uz','gamma','charge','w'], iteration=iteration,
                                                     species=species, select=select)
             vz = c*uz/gamma
-            values, bin = np.histogram(norm_z*z, bins=bins, weights=q*vz*w)
-            q = 1
-            N_tot = 1
+            vzq, Bin = np.histogram(norm_z*z, bins=bins, weights=q*vz*w)
+            len_z = (z.max()-z.min())
+            values = vzq*bins/len_z
+            q, N_tot = (1,1)
         else:    
             comp, q, w = self.ts.get_particle([component, 'charge', 'w'], iteration=iteration,
                                         species=species, select=select)
-            values, bin = np.histogram(norm_z*comp, bins=bins, weights=w, density=True)
+            values, Bin = np.histogram(norm_z*comp, bins=bins, weights=w, density=True)
             N_tot = w.sum()*in_ptcl_percent
+            q = np.abs(q)
             if not charge:
                 q = 1
-            elif q<0:
-                q=-q
 
-        values, bin, patches = plt.hist(bin[:-1], bin, weights=values*q*N_tot, **kwargs)
+        values, Bin, patches = plt.hist(Bin[:-1], Bin, weights=values*q*N_tot, **kwargs)
         del patches
 
         if output:
-            return values, bin
+            return values, Bin
 
     def phase_space_hist(self, species, iteration, components=['z','uz'],
                          select=None, z0=0., norms=[1.,1.], charge=False,
