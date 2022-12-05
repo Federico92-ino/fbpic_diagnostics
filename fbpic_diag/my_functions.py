@@ -1043,10 +1043,6 @@ class Diag(object):
         if 'weights' in kwargs:
             del kwargs['weights']
 
-        if 'text_pos' in kwargs:
-            pos = kwargs['text_pos']
-            del kwargs['text_pos']
-
         if 'bins' in kwargs:
             bins = kwargs['bins']
             del kwargs['bins']
@@ -1065,6 +1061,8 @@ class Diag(object):
             N_tot = w.sum()*in_ptcl_percent
             if not charge:
                 q = 1
+            elif q<0:
+                q=-q
 
         values, bin, patches = plt.hist(bin[:-1], bin, weights=values*q*N_tot, **kwargs)
         del patches
