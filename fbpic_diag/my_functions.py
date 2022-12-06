@@ -1075,7 +1075,7 @@ class Diag(object):
         del patches, _
         ax = patch.axes
         patch.set_xy(patch.get_xy()*np.array([norm_z,inv_norm_z]))
-        ax.set_xlim(patch.get_xy[0,0],patch.get_xy()[-1,0])
+        ax.set_xlim(patch.get_xy()[0,0],patch.get_xy()[-1,0])
         ax.set_ylim(0.,values.max()*inv_norm_z)
 
         if output:
