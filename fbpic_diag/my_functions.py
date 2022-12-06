@@ -1008,8 +1008,9 @@ class Diag(object):
             component: str
                 Choose a component in .avail_recorded_components
                 to do the weighted distibution of that quantity;
-                if 'current', it returns the longitudinal current (in A)
-                carried by the specific 'species' versus 'z'. 
+                if 'current', it returns the longitudinal current
+                carried by the specific 'species' versus 'z';
+                positive values in Ampere (A). 
             iteration: int
                 Which iteration we need
             select: dictionary or ParticleTracker instance
@@ -1031,10 +1032,13 @@ class Diag(object):
         **Returns**
 
             values, bins: np.arrays
-                If 'output' is True, arrays with bins values and bins edges.
+                If 'output' is True, arrays with bins values and bins edges in MKS units,
+                regardless of 'norm_z' factor.
+            The plotted graph returns dN(dQ)/dcomp vs comp with axis units according to norm_z;
+            in case of 'current', it's returned in Ampere vs z.
 
         """
-        in_ptcl_percent = 1/self.params['subsampling_fraction']
+        ipp = 1/self.params['subsampling_fraction']
         bins = 300
 
         if 'density' in kwargs:
@@ -1051,21 +1055,28 @@ class Diag(object):
             z, uz, gamma, q, w = self.ts.get_particle(['z','uz','gamma','charge','w'], iteration=iteration,
                                                     species=species, select=select)
             vz = c*uz/gamma
-            vzq, Bin = np.histogram(norm_z*z, bins=bins, weights=q*vz*w)
-            len_z = (z.max()-z.min())
-            values = vzq*bins/len_z
-            q, N_tot = (1,1)
+            pre_values, Bin = np.histogram(z, bins=bins, weights=q*vz*w*ipp)
+            inv_dz = bins/(z.max()-z.min())
+            values = np.abs(pre_values*inv_dz)
+            inv_norm_z = 1
         else:    
             comp, q, w = self.ts.get_particle([component, 'charge', 'w'], iteration=iteration,
                                         species=species, select=select)
-            values, Bin = np.histogram(norm_z*comp, bins=bins, weights=w, density=True)
-            N_tot = w.sum()*in_ptcl_percent
             q = np.abs(q)
             if not charge:
                 q = 1
+            pre_values, Bin = np.histogram(comp, bins=bins, weights=q*w*ipp)
+            inv_dz = bins/(comp.max()-comp.min())
+            values = np.abs(pre_values*inv_dz)
+            inv_norm_z = 1/norm_z
 
-        values, Bin, patches = plt.hist(Bin[:-1], Bin, weights=values*q*N_tot, **kwargs)
-        del patches
+        _, _, patches = plt.hist(Bin[:-1], Bin, weights=values, **kwargs)
+        patch = patches.pop()
+        del patches, _
+        ax = patch.axes
+        patch.set_xy(patch.get_xy()*np.array([norm_z,inv_norm_z]))
+        ax.set_xlim(patch.get_xy[0,0],patch.get_xy()[-1,0])
+        ax.set_ylim(0.,values.max()*inv_norm_z)
 
         if output:
             return values, Bin
