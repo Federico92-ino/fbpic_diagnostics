@@ -936,14 +936,14 @@ class Diag(object):
             B = 'ux'
 
         if property == 'charge':
-            q = self.ts.get_particle(['charge'], t=t[-1], select=selection, species=species)[0]
+            q = self.ts.get_particle(['charge'], t=t[-1], select=select, species=species)[0]
         
         if property not in self.avail_bunch_prop:
             prop = '\n -'.join(self.avail_bunch_prop)
             raise ValueError(str(property) + " is not an available property.\n"
                              "Available properties are:\n -{:s}\nTry again".format(prop))
         else:
-            if zeta_coord and ('z' in select):
+            if zeta_coord and isinstance(select,dict) and ('z' in select):
 
                 if time != 0.:
                     time = time
@@ -1003,31 +1003,30 @@ class Diag(object):
                         a[k] = twiss(x, ux, uz, w, property.remove('tw_',''))
             else:
                 for k, i in enumerate(t):
-                    selection = select
                     z, w = self.ts.get_particle(['z', 'w'],
-                     t=i, select=selection,
+                     t=i, select=select,
                      species=species)
                     Z[k] = mean(z,w)
                     if property == 'ph_emit_n':
                         x, ux = self.ts.get_particle([A, B],t=i,
-                                select=selection,species=species)                        
+                                select=select,species=species)                        
                         a[k] = emittance(x, ux, w)
                         continue
                     elif property == 'beam_size':
-                        x = self.ts.get_particle([A], t=i, select=selection, species=species)[0]
+                        x = self.ts.get_particle([A], t=i, select=select, species=species)[0]
                         a[k] = central_average(x, w)
                         continue
                     elif property == 'momenta_spread':
-                        ux = self.ts.get_particle([B], t=i, select=selection, species=species)[0]
+                        ux = self.ts.get_particle([B], t=i, select=select, species=species)[0]
                         a[k] = central_average(ux, w)
                         continue
                     elif property == 'divergence':
-                        ux, uz = self.ts.get_particle([B,'uz'], t=i, select=selection, species=species)
+                        ux, uz = self.ts.get_particle([B,'uz'], t=i, select=select, species=species)
                         slope = divergence(px=ux,pz=uz)
                         a[k] = central_average(slope,w)
                         continue
                     elif property == 'solid_div':
-                        ux, uy, uz = self.ts.get_particle(['ux','uy','uz'], t=i, select=selection, species=species)
+                        ux, uy, uz = self.ts.get_particle(['ux','uy','uz'], t=i, select=select, species=species)
                         solid = divergence(ux,uy,uz)
                         a[k] = central_average(solid,w)
                         continue
@@ -1038,20 +1037,20 @@ class Diag(object):
                             a[k] = q*w.sum()*inv_ptcl_percent
                         continue
                     elif property == 'mean_energy':
-                        gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
+                        gamma = self.ts.get_particle(['gamma'], t=i, select=select, species=species)[0]
                         a[k] = mean(gamma,w,energy=True)
                         continue
                     elif property == 'en_spread':
-                        gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
+                        gamma = self.ts.get_particle(['gamma'], t=i, select=select, species=species)[0]
                         a[k] = energy_spread(gamma, w)
                         continue
                     elif property == 'tr_emit':
-                        x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                        x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=select, species=species)
                         slope = divergence(px=ux, pz=uz)
                         a[k] = emittance(x, slope, w)
                         continue
                     elif property in ['tw_alpha','tw_beta','tw_gamma']:
-                        x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                        x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=select, species=species)
                         a[k] = twiss(x, ux, uz, w, property.remove('tw_',''))
             if output:
                 return Z, a
