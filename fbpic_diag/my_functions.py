@@ -261,46 +261,57 @@ class Diag(object):
 
         **Parameters**
 
-            N: int
-                Number of slices
-            select: dict or ParticleTracker object, optional
-                - If `select` is a dictionary:
-                then it lists a set of rules to select the particles, of the form
-                'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
-                'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
-                'uz' : [5., None]  (Particles with uz above 5 mc)
-                - If `select` is a ParticleTracker object:
-                then it returns particles that have been selected at another
-                iteration ; see the docstring of `ParticleTracker` for more info.
-            species: string
-                A string indicating the name of the species
-                This is optional if there is only one species
-            iteration : int
-                The iteration at which to obtain the data
-                Default is first iteration
-            plot: bool
-                If 'True' returns the plot. Default is 'False'.
-            components: list of str
-                The components of phase-space to plot. Default is 'x','ux'.
-            mask: float
-                A value to mask undesired points in plot.
-            trans_space: str
-                Transverse phase space to consider in calculation: 'x' or 'y'; default is 'x'
-            z0: float
-                If 'z' is in 'components' the z axis is transformed to z+z0.
-                Default is z0=0; to be set in meters.
-            norms: list of floats
-                A list of two float constants to multiply the values of 'components' for normalization;
-                consider that positions are in meters.
-                Default is [1.,1.].
-            **kwargs
-                Parameters of .pcolormesh method.
+        N: int
+            Number of slices
+
+        select: dict or ParticleTracker object, optional
+         - If `select` is a dictionary
+         then it lists a set of rules to select the particles, of the form
+           - 'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
+           - 'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
+           - 'uz' : [5., None]  (Particles with uz above 5 mc)
+         - If `select` is a ParticleTracker object
+         then it returns particles that have been selected at another
+         iteration ; see the docstring of `ParticleTracker` for more info.
+
+        species: string
+            A string indicating the name of the species
+            This is optional if there is only one species
+
+        iteration : int
+            The iteration at which to obtain the data
+            Default is first iteration
+
+        plot: bool
+            If 'True' returns the plot. Default is 'False'.
+
+        components: list of str
+            The components of phase-space to plot. Default is 'x','ux'.
+
+        mask: float
+            A value to mask undesired points in plot.
+
+        trans_space: str
+            Transverse phase space to consider in calculation: 'x' or 'y'; default is 'x'
+
+        z0: float
+            If 'z' is in 'components' the z axis is transformed to z+z0.
+            Default is z0=0; to be set in meters.
+
+        norms: list of floats
+            A list of two float constants to multiply the values of 'components' for normalization;
+            consider that positions are in meters.
+            Default is [1.,1.].
+
+        **kwargs
+            Parameters of .pcolormesh method.
 
         **Returns**
 
             S_prop: dictionary
                 Properties of each slice:
                 ph_emit_n, beam_size, momenta_spread and mean position of each slice
+
             dz: float
                 Longitudinal slices' thickness.
         """
@@ -426,48 +437,56 @@ class Diag(object):
         Function to calculate 'prop' evolution of 'n_slice' slices of width 'dz'
 
         **Parameters**
-            dz: float
-                Width, in meters, of each slice
-            n_slice: list of floats
-                A list of floats indicating which slices are considered respect the
-                z_mean position of selected bunch, in units of sigma_z,; z_mean is
-                calculated for each iteration, e.g:
-                    - for n_slice ranging from m to n, this function make computation for slices
-                      centered  in (z_mean + m*sigma_z), ..., (z_mean + n*sigma_z), calculating
-                      z_mean and sigma_z every iteration
-            prop: str
-                This sets which property to be calculated
-                You can choose from the following list:
-                    - ph_emit_n (normalized phase emittance)
-                    - tr_emit (trace emittance)
-                    - beam_size
-                    - momenta_spread
-                    - divergence
-                    - solid_div
-                    - charge
-                    - mean_energy
-                    - en_spread (energy spread)
-                    - tw_alpha, tw_beta, tw_gamma (Twiss parameters)
-            trans_space: str
-                'x' or 'y' transverse phase space; default is 'x'
-            select: dict or ParticleTracker object, optional
-              - If `select` is a dictionary:
-              then it lists a set of rules to select the particles, of the form
-              'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
-              'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
-              'uz' : [5., None]  (Particles with uz above 5 mc)
-              - If `select` is a ParticleTracker object:
-              then it returns particles that have been selected at another
-              iteration ; see the docstring of `ParticleTracker` for more info.
-            species: string
-                A string indicating the name of the species
-                This is optional if there is only one species
-            norm_z: float
-                Constant to multiply z-axis for normalization; set in meters
+        dz: float
+            Width, in meters, of each slice
+
+        n_slice: list of floats
+            A list of floats indicating which slices are considered respect the
+            z_mean position of selected bunch, in units of sigma_z,; z_mean is
+            calculated for each iteration, e.g:
+             - for n_slice ranging from m to n, this function make computation for slices
+               centered  in (z_mean + m*sigma_z), ..., (z_mean + n*sigma_z), calculating
+               z_mean and sigma_z every iteration
+
+        prop: str
+            This sets which property to be calculated
+            You can choose from the following list:
+             - ph_emit_n (normalized phase emittance)
+             - tr_emit (trace emittance)
+             - beam_size
+             - momenta_spread
+             - divergence
+             - solid_div
+             - charge
+             - mean_energy
+             - en_spread (energy spread)
+             - tw_alpha, tw_beta, tw_gamma (Twiss parameters)
+
+        trans_space: str
+            'x' or 'y' transverse phase space; default is 'x'
+
+        select: dict or ParticleTracker object, optional
+         - If `select` is a dictionary:
+         then it lists a set of rules to select the particles, of the form
+           - 'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
+           - 'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
+           - 'uz' : [5., None]  (Particles with uz above 5 mc)
+         - If `select` is a ParticleTracker object:
+         then it returns particles that have been selected at another
+         iteration ; see the docstring of `ParticleTracker` for more info.
+
+        species: str
+            A string indicating the name of the species
+            This is optional if there is only one species
+
+        norm_z: float
+            Constant to multiply z-axis for normalization; set in meters
+
         **Returns**
             Z: ndarray
                 Array of shape (len(n_slice),len(iterations)), each raw corresponding to
                 slices 
+
             a: ndarray 
                 Array of prop values, each raw corrisponding to slices
         """         
@@ -594,36 +613,47 @@ class Diag(object):
 
         **Parameters**
 
-            field_name: string
-                    Field to plot
-            iteration: int
-                    The same as usual
-            coord, theta, m: same parameters of .get_field() method.
-                    Same defaults (None, 0, 'all')
-            normalize: bool, optional
-                    If normalize=True this 'turns on' the normalization.
-                    Default is 'False'.
-            A0: float, optional
-                    If normalize=True this allows to set the normilizing costant.
-                    Default is 'None: in this case normalization is set to
-                    usual units, e.g:
-                    - e*n_e for charge density 'rho'; this returns normalized density
-                    - m_e*c*omega_0/e for transverse 'E'
-                    - m_e*c*omega_p/e for longitudinal 'E'
-            slicing: str, optional
-                    This sets the slicing along the chosen direction ('z' or 'r').
-                    Default is 'z'.
-            on_axis: float, in meters
-                    Coord in meters of slicing line along the chosen direction.
-                    Default is 'r' = '0.' or 'z' = mid of the z-axis
-            z0: float, optional
-                    Transforms z coords into z+z0 coords; to be set in meters.
-                    Deafult is z0=0.
-            norm_z: float
-                    Constant to multiply x-axis for normalization to be set in meters^-1,
-                    or changing the order of magnitude (e.g. multiply for 1.e6 to set microns).
-            **kwargs: keywords to pass to .pyplot.plot() function
+        field_name: string
+            Field to plot
+
+        iteration: int
+            The same as usual
+
+        coord, theta, m: same parameters of .get_field() method.
+            Same defaults (None, 0, 'all')
+
+        normalize: bool, optional
+            If normalize=True this 'turns on' the normalization.
+            Default is 'False'.
+
+        A0: float, optional
+            If normalize=True this allows to set the normilizing costant.
+            Default is 'None: in this case normalization is set to
+            usual units, e.g:
+             - e*n_e for charge density 'rho'; this returns normalized density
+             - m_e*c*omega_0/e for transverse 'E'
+             - m_e*c*omega_p/e for longitudinal 'E'
+
+        slicing: str, optional
+            This sets the slicing along the chosen direction ('z' or 'r').
+            Default is 'z'.
+
+        on_axis: float, in meters
+            Coord in meters of slicing line along the chosen direction.
+            Default is 'r' = '0.' or 'z' = mid of the z-axis
+
+        z0: float, optional
+            Transforms z coords into z+z0 coords; to be set in meters.
+            Deafult is z0=0.
+
+        norm_z: float
+            Constant to multiply x-axis for normalization to be set in meters^-1,
+            or changing the order of magnitude (e.g. multiply for 1.e6 to set microns).
+
+        **kwargs: keywords to pass to .pyplot.plot() function
+
         """
+
         if field_name == 'phi':
             E, info_e = self.__potential__(iteration, theta=theta, m=m)
         elif field_name == 'force':
@@ -660,34 +690,43 @@ class Diag(object):
 
         **Parameters**
 
-            field_name: string
-                    Field to plot
-            iteration: int
-                    The same as usual
-            coord, theta, m: same parameters of .get_field() method.
-                         Same defaults (None, 0, 'all')
-            normalize: bool, optional;
-                    If normalize=True this 'turns on' the normalization.
-                    Default is 'False'.
-            A0: float, optional;
-                    If normalize=True this allows to set the normalizing
-                    constant.
-                    Default is 'None: in this case normalization is set to
-                    usual units, e.g:
-                    - e*n_e for charge density 'rho'; this returns normalized
-                      density
-                    - m_e*c*omega_0/e for transverse 'E'
-                    - m_e*c*omega_p/e for longitudinal 'E'
-            z0: float, optional
-                    Transforms z coords into z+z0 coords; to be set in meters.
-                    Deafult is z0=0.
-            norms: list of floats
-                    A list of two float constants to multiply the values
-                    of both axis for normalization or magnitude changings; 
-                    norms[0] for z-axis, norms[1] for r-axis.
-                    Set in meters^-1; default is [1.,1.].
-            **kwargs: keywords to pass to .Axes.imshow() method
+        field_name: string
+            Field to plot
+
+        iteration: int
+            The same as usual
+
+        coord, theta, m: same parameters of .get_field() method.
+            Same defaults (None, 0, 'all')
+
+        normalize: bool, optional;
+            If normalize=True this 'turns on' the normalization.
+            Default is 'False'.
+
+        A0: float, optional;
+            If normalize=True this allows to set the normalizing
+            constant.
+            Default is 'None: in this case normalization is set to
+            usual units, e.g:
+             - e*n_e for charge density 'rho'; this returns normalized
+               density
+             - m_e*c*omega_0/e for transverse 'E'
+             - m_e*c*omega_p/e for longitudinal 'E'
+
+        z0: float, optional
+            Transforms z coords into z+z0 coords; to be set in meters.
+            Deafult is z0=0.
+
+        norms: list of floats
+            A list of two float constants to multiply the values
+            of both axis for normalization or magnitude changings; 
+            norms[0] for z-axis, norms[1] for r-axis.
+            Set in meters^-1; default is [1.,1.].
+
+        **kwargs: keywords to pass to .Axes.imshow() method
+
         """
+
         if field_name == 'phi':
             E, info_e = self.__potential__(iteration, theta=theta, m=m)
         elif field_name == 'force':
@@ -721,36 +760,46 @@ class Diag(object):
 
         **Parameters**
 
-            field_name: string
-                    Field to plot
-            coord, m: same parameters of .get_field() method.
-                         Same defaults (None, 0, 'all')
-            iteration: int
-                    The same as usual
-            normalize: bool, optional;
-                    If normalize=True this 'turns on' the normalization.
-                    Default is 'False'.
-            A0: float, optional;
-                    If normalize=True this allows to set the normalizing
-                    constant.
-                    Default is 'None: in this case normalization is set to
-                    usual units, e.g:
-                    - e*n_e for charge density 'rho'; this returns normalized
-                      density
-                    - m_e*c*omega_0/e for transverse 'E'
-                    - m_e*c*omega_p/e for longitudinal 'E'
-            z_pos: float, optional
-                    Choose the actual z-position where to slice the considered field_name;
-                    to be set in meters. Default is the first slice.
-            swap_axis: bool
-                    Whether to plot in x-y or y-x plane with inverted y-axis; default is x-y (False)
-            norms: list of floats
-                    A list of two float constants to multiply the values
-                    of both axis for normalization or magnitude changings; 
-                    norms[0] for z-axis, norms[1] for r-axis.
-                    Set in meters^-1; default is [1.,1.].
-            **kwargs: keywords to pass to .pcolormesh() method
+        field_name: string
+            Field to plot
+
+        coord, m: same parameters of .get_field() method.
+            Same defaults (None, 0, 'all')
+
+        iteration: int
+            The same as usual
+
+        normalize: bool, optional;
+            If normalize=True this 'turns on' the normalization.
+            Default is 'False'.
+
+        A0: float, optional;
+            If normalize=True this allows to set the normalizing
+            constant.
+            Default is 'None: in this case normalization is set to
+            usual units, e.g:
+             - e*n_e for charge density 'rho'; this returns normalized
+               density
+             - m_e*c*omega_0/e for transverse 'E'
+             - m_e*c*omega_p/e for longitudinal 'E'
+
+        z_pos: float, optional
+            Choose the actual z-position where to slice the considered field_name;
+            to be set in meters. Default is the first slice.
+
+        swap_axis: bool
+            Whether to plot in x-y or y-x plane with inverted y-axis; default is x-y (False)
+
+        norms: list of floats
+            A list of two float constants to multiply the values
+            of both axis for normalization or magnitude changings; 
+            norms[0] for z-axis, norms[1] for r-axis.
+            Set in meters^-1; default is [1.,1.].
+
+        **kwargs: keywords to pass to .pcolormesh() method
+
         """
+
         Nr = self.params['Nr']
         test_field = self.avail_fields[0]
         if self.ts.fields_metadata[test_field]['type'] == 'vector':
@@ -808,56 +857,67 @@ class Diag(object):
 
         **Parameters**
 
-            select: dict or ParticleTracker object, optional
-              - If `select` is a dictionary:
-              then it lists a set of rules to select the particles, of the form
-              'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
-              'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
-              'uz' : [5., None]  (Particles with uz above 5 mc)
-              - If `select` is a ParticleTracker object:
-              then it returns particles that have been selected at another
-              iteration ; see the docstring of `ParticleTracker` for more info.
-              - If 'select' contains 'z' and 'zeta_coord'='True':
-              selection is made in co-moving frame
-            property: str
-                This sets which property will be plotted.
-                You can choose from the following list:
-                    - ph_emit_n (normalized phase emittance)
-                    - tr_emit (trace emittance)
-                    - beam_size 
-                    - momenta_spread
-                    - divergence
-                    - solid_div
-                    - charge
-                    - mean_energy
-                    - en_spread (energy spread)
-                    - tw_alpha, tw_beta, tw_gamma (Twiss parameters)
-            species: string
-                A string indicating the name of the species.
-                This is optional if there is only one species.
-            trans_space: str
-                'x' or 'y' transverse phase space; default is 'x'
-            zeta_coord: bool
-                If 'True'and 'z' in 'select', the 'z' selection
-                is done in co-moving frame.
-            time: float
-                Specify the time (s) at which refers the 'z' selection
-                when activated the co-moving frame.
-                Default is the first iteration.
-            t_lim: list of two floats 
-                Set the time window you want to plot.
-                Use self.t values as limits (s); default is all time_series.
-            output: bool
-                If True, it returns two arrays with Z mean positions of the bunch
-                during the propagation and the values of property.
-                Default is True.
-            plot: bool
-                If you want to plot. Default is 'False'.
-            norm_z: float
-                Multiplying constant to normalize z-axis; set in meters.
-            Norm: float
-                Multiplying constant to set properties normalization.
-            **kwargs: keyword to pass to .pyplot.plot()
+        select: dict or ParticleTracker object, optional
+             - If `select` is a dictionary:
+             then it lists a set of rules to select the particles, of the form
+             'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
+             'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
+             'uz' : [5., None]  (Particles with uz above 5 mc)
+             - If `select` is a ParticleTracker object:
+             then it returns particles that have been selected at another
+             iteration ; see the docstring of `ParticleTracker` for more info.
+             - If 'select' contains 'z' and 'zeta_coord'='True':
+             selection is made in co-moving frame
+        
+        property: str
+            This sets which property will be plotted.
+            You can choose from the following list:
+             - ph_emit_n (normalized phase emittance)
+             - tr_emit (trace emittance)
+             - beam_size 
+             - momenta_spread
+             - divergence
+             - solid_div
+             - charge
+             - mean_energy
+             - en_spread (energy spread)
+             - tw_alpha, tw_beta, tw_gamma (Twiss parameters)
+
+        species: str
+            A string indicating the name of the species.
+            This is optional if there is only one species.
+
+        trans_space: str
+            'x' or 'y' transverse phase space; default is 'x'
+
+        zeta_coord: bool
+            If 'True'and 'z' in 'select', the 'z' selection
+            is done in co-moving frame.
+
+        time: float
+            Specify the time (s) at which refers the 'z' selection
+            when activated the co-moving frame.
+            Default is the first iteration.
+
+        t_lim: list of two floats 
+            Set the time window you want to plot.
+            Use self.t values as limits (s); default is all time_series.
+
+        output: bool
+            If True, it returns two arrays with Z mean positions of the bunch
+            during the propagation and the values of property.
+            Default is True.
+
+        plot: bool
+            If you want to plot. Default is 'False'.
+
+        norm_z: float
+            Multiplying constant to normalize z-axis; set in meters.
+
+        Norm: float
+            Multiplying constant to set properties normalization.
+
+        **kwargs: keyword to pass to .pyplot.plot()
 
         """
         inv_ptcl_percent = 1/self.params['subsampling_fraction']
@@ -1005,29 +1065,36 @@ class Diag(object):
 
         **Parameters**
 
-            component: str
-                Choose a component in .avail_recorded_components
-                to do the weighted distibution of that quantity;
-                if 'current', it returns the longitudinal current
-                carried by the specific 'species' versus 'z';
-                positive values in Ampere (A). 
-            iteration: int
-                Which iteration we need
-            select: dictionary or ParticleTracker instance
-                Particle selector
-            species: str, optional
-                Default is the first available species
-            output: bool, optional, default: 'False'
-                If 'True' returns the values of histogram and bins
-                edges; length of bins array is nbins+1 
-                (lefts edges and right edge of the last bin).
-            norm_z: float, optional
-                A constant to multiply the x-axis.
-            charge: bool, optional
-                If True this sets the y-axis on dQ/dcomp values, except in case
-                component is 'current'.
-                Default is False, that means setting y-axis on dN/dcomp values
-            **kwargs: keyword to pass to .hist() method.
+        component: str
+            Choose a component in .avail_recorded_components
+            to do the weighted distibution of that quantity;
+            if 'current', it returns the longitudinal current
+            carried by the specific 'species' versus 'z';
+            positive values in Ampere (A). 
+
+        iteration: int
+            Which iteration we need
+
+        select: dictionary or ParticleTracker instance
+            Particle selector
+
+        species: str, optional
+            Default is the first available species
+
+        output: bool, optional, default: 'False'
+            If 'True' returns the values of histogram and bins
+            edges; length of bins array is nbins+1 
+            (lefts edges and right edge of the last bin).
+
+        norm_z: float, optional
+            A constant to multiply the x-axis.
+
+        charge: bool, optional
+            If True this sets the y-axis on dQ/dcomp values, except in case
+            component is 'current'.
+            Default is False, that means setting y-axis on dN/dcomp values
+
+        **kwargs: keyword to pass to .hist() method.
 
         **Returns**
 
@@ -1038,6 +1105,7 @@ class Diag(object):
             in case of 'current', it's returned in Ampere vs z.
 
         """
+
         ipp = 1/self.params['subsampling_fraction']
         bins = 300
 
@@ -1087,36 +1155,45 @@ class Diag(object):
         """
         Method that plots a 2D histogram of the particles phase space.
 
-        Parameters:
-        ----------
-            species: str
-                Select the particle specie among the available ones
-                (Check them out in avail_species)
-            iteration: int
-                Selected iteration
-            components: list, str
-                List of phase space components of the phase space plot
-                (Check the available components in avail_record_components)
-                You can plot also the 'divergence' method outputs:
-                    -'div_x' is for div along planar slice x-z
-                    -'div_y' is for div along planar slice y-z
-                    -'div2' is for total div
-            select: dict
-                Particle selector
-            z0: float
-                If 'z' is in 'components' the z axis is transformed to z+z0.
-                Default is z0=0; to be set in meters.
-            norms: list of floats
-                A list of two float constants to multiply the values
-                of 'components' for normalization; consider that positions are in meters.
-                Default is [1.,1.].
-            charge: bool, optional
-                If True, sets the values of histogram to dQ/dc1dc2, otherwise dN/dc1dc2.
-                Default is False.
-            mask: float, optional
-                A float in [0.,1.] to mask all bins with a value <= mask*max(hist_values).
-            **kwargs:
-                keywords passing to plt.pcolormesh().
+        **Parameters**:
+
+        species: str
+            Select the particle specie among the available ones
+            (Check them out in avail_species)
+
+        iteration: int
+            Selected iteration
+
+        components: list, str
+            List of phase space components of the phase space plot
+            (Check the available components in avail_record_components)
+            You can plot also the 'divergence' method outputs:
+             - 'div_x' is for div along planar slice x-z
+             - 'div_y' is for div along planar slice y-z
+             - 'div2' is for total div
+
+        select: dict
+            Particle selector
+
+        z0: float
+            If 'z' is in 'components' the z axis is transformed to z+z0.
+            Default is z0=0; to be set in meters.
+
+        norms: list of floats
+            A list of two float constants to multiply the values
+            of 'components' for normalization; consider that positions are in meters.
+            Default is [1.,1.].
+
+        charge: bool, optional
+            If True, sets the values of histogram to dQ/dc1dc2, otherwise dN/dc1dc2.
+            Default is False.
+
+        mask: float, optional
+            A float in [0.,1.] to mask all bins with a value <= mask*max(hist_values).
+
+        **kwargs:
+            keywords passing to plt.pcolormesh().
+
         """
 
         inv_ptcl_percent = 1/self.params['subsampling_fraction']
