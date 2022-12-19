@@ -1051,7 +1051,7 @@ class Diag(object):
                         continue
                     elif property in ['tw_alpha','tw_beta','tw_gamma']:
                         x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=select, species=species)
-                        a[k] = twiss(x, ux, uz, w, property.remove('tw_',''))
+                        a[k] = twiss(x, ux, uz, w, property.replace('tw_',''))
             if output:
                 return Z, a
             if plot:
