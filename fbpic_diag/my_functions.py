@@ -1132,7 +1132,6 @@ class Diag(object):
         else:    
             comp, q, w = self.ts.get_particle([component, 'charge', 'w'], iteration=iteration,
                                         species=species, select=select)
-            q = np.abs(q)
             if not charge:
                 q = 1.
             pre_values, Bin = np.histogram(comp, bins=bins, weights=q*w*ipp)
@@ -1141,13 +1140,8 @@ class Diag(object):
             inv_norm_z = 1/norm_z
         
         if plot:
-            _, _, patches = plt.hist(Bin[:-1], Bin, weights=values, **kwargs)
-            patch = patches.patches.pop()
-            del patches, _
-            ax = patch.axes
-            patch.set_xy(patch.get_xy()*np.array([norm_z,inv_norm_z]))
-            ax.set_xlim(patch.get_xy()[0,0],patch.get_xy()[-1,0])
-            ax.set_ylim(0.,values.max()*inv_norm_z)
+            _, _, _ = plt.hist(Bin[:-1]*norm_z, Bin*norm_z, weights=values*inv_norm_z, **kwargs)
+            del _
 
         if output:
             return values, Bin
