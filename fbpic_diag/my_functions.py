@@ -1058,7 +1058,7 @@ class Diag(object):
                 plt.plot(Z*norm_z, a*Norm, **kwargs)
 
     def spectrum(self, component, iteration, select=None, species=None,
-                norm_z =1., output=False, charge=False, **kwargs):
+                norm_z =1., output=False, charge=False, plot=True, **kwargs):
         """
         Method to easily get an energy spectrum of 'selected' particles
 
@@ -1092,6 +1092,9 @@ class Diag(object):
             If True this sets the y-axis on dQ/dcomp values, except in case
             component is 'current'.
             Default is False, that means setting y-axis on dN/dcomp values
+        
+        plot: bool, default: 'True'
+            Boolean to turn on plotting
 
         **kwargs: keyword to pass to .hist() method.
 
@@ -1136,14 +1139,15 @@ class Diag(object):
             inv_dz = bins/(comp.max()-comp.min())
             values = np.abs(pre_values*inv_dz)
             inv_norm_z = 1/norm_z
-
-        _, _, patches = plt.hist(Bin[:-1], Bin, weights=values, **kwargs)
-        patch = patches.pop()
-        del patches, _
-        ax = patch.axes
-        patch.set_xy(patch.get_xy()*np.array([norm_z,inv_norm_z]))
-        ax.set_xlim(patch.get_xy()[0,0],patch.get_xy()[-1,0])
-        ax.set_ylim(0.,values.max()*inv_norm_z)
+        
+        if plot:
+            _, _, patches = plt.hist(Bin[:-1], Bin, weights=values, **kwargs)
+            patch = patches.pop()
+            del patches, _
+            ax = patch.axes
+            patch.set_xy(patch.get_xy()*np.array([norm_z,inv_norm_z]))
+            ax.set_xlim(patch.get_xy()[0,0],patch.get_xy()[-1,0])
+            ax.set_ylim(0.,values.max()*inv_norm_z)
 
         if output:
             return values, Bin
