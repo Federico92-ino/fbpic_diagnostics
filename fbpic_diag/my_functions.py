@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from openpmd_viewer import OpenPMDTimeSeries
 import json
 from scipy.constants import e, m_e, c, pi
+from scipy.signal import hilbert
 
 def divergence(px=None, py=None, pz=None):
 
@@ -1152,7 +1153,7 @@ class Diag(object):
         """
         Method that plots a 2D histogram of the particles phase space.
 
-        **Parameters**:
+        **Parameters**
 
         species: str
             Select the particle specie among the available ones
@@ -1272,3 +1273,39 @@ class Diag(object):
         H = H.T*q*N_tot
         H = np.ma.masked_less_equal(H,mask*H.max())
         plt.pcolormesh(xedge, yedge, H, cmap=cmap, alpha=alpha,**kwargs)
+    
+    def  laser_waist_amplitude_evolution(self, it_window=None):
+        """
+        Method to calculate peak amplitude and waist (defined as the 
+        peak_amplitude*e^-1 position) evolution during laser propagation
+
+        **Parameters**
+
+        it_window: tuple or list of two ints
+            Selects the temporal window wanted for calculations
+
+        **Returns**
+
+            z, w0, A: np.arrays
+                z is the array of the longitudinal positions taken as a(z)=a_peak=A[t]
+        """
+        if it_window is None:
+            it = self.iterations
+        it = self.iterations[it_window[0]:it_window[1]]
+        A=np.zeros(len(it))
+        w0=np.zeros(len(it))
+        z=np.zeros(len(it))
+        E0=self.__normalize__('E','x',None)
+        for t in range(len(it)):
+            E,info=self.ts.get_field('E',coord='x',iteration=it[t])
+            env=np.abs(hilbert(E))
+            a=env/E0
+            i,j=np.unravel_index(np.argmax(a), shape=a.shape )
+            field=a[:,j]
+            a0=a[i,j]
+            Mask=np.ma.masked_where(field>=a0/np.e,field)
+            r=info.r[Mask.mask]
+            A[t]=a0
+            w0[t]=r.max()
+            z[t]=info.z[j]
+        return z, w0, A
