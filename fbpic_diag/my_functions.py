@@ -9,6 +9,7 @@ from openpmd_viewer import OpenPMDTimeSeries
 import json
 from scipy.constants import e, m_e, c, pi
 from scipy.signal import hilbert
+from scipy.signal import hilbert
 
 def divergence(px=None, py=None, pz=None):
 
