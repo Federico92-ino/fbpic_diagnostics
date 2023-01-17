@@ -1143,6 +1143,7 @@ class Diag(object):
         
         if plot:
             _, _, _ = plt.hist(Bin[:-1]*norm_z, Bin*norm_z, weights=values*inv_norm_z, **kwargs)
+            plt.ylim(0.,values.max()*1.05)
             del _
 
         if output:
