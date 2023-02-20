@@ -1204,7 +1204,8 @@ class Diag(object):
         q, weight = self.ts.get_particle(['charge', 'w'],iteration=iteration,
                                          select=select,species=species)
         N_tot = weight.sum()*inv_ptcl_percent
-
+        q = np.abs(q)
+        
         if 'cmap' in kwargs:
             cmap = kwargs['cmap']
             del kwargs['cmap']
