@@ -1221,39 +1221,40 @@ class Diag(object):
         if not charge:
             q = 1
 
-        if 'div_x' in components:
-            if components.index('div_x') == 0:
+        if 'div' in components[0]:
+            if 'x' in components[0]:
                 px, pz, comp2 = \
                     self.ts.get_particle(['ux', 'uz', components[1]],iteration=iteration,
                                          select=select,species=species)
                 comp1 = divergence(px=px, pz=pz)
-            else:
-                px, pz, comp1 = \
-                    self.ts.get_particle(['ux', 'uz', components[0]],iteration=iteration,
-                                         select=select,species=species)
-                comp2 = divergence(px=px, pz=pz)
-        elif 'div_y' in components:
-            if components.index('div_y') == 0:
+            elif 'y' in components[0]:
                 px, pz, comp2 = \
                     self.ts.get_particle(['uy', 'uz', components[1]],iteration=iteration,
                                          select=select,species=species)
                 comp1 = divergence(px=px, pz=pz)
-            else:
+            elif '2' in components[0]:
+                px, py, pz, comp2 = \
+                    self.ts.get_particle(['ux', 'uy', 'uz', components[1]],iteration=iteration,
+                                         select=select,species=species)
+                comp1 = divergence(px=px,py=py,pz=pz)
+
+        elif 'div' in components[1]:
+            if 'x' in components[1]:
+                px, pz, comp1 = \
+                    self.ts.get_particle(['ux', 'uz', components[0]],iteration=iteration,
+                                         select=select,species=species)
+                comp2 = divergence(px=px, pz=pz)
+            elif 'y' in components[1]:
                 px, pz, comp1 = \
                     self.ts.get_particle(['uy', 'uz', components[0]],iteration=iteration,
                                          select=select,species=species)
                 comp2 = divergence(px=px, pz=pz)
-        elif 'div2' in components:
-            if components.index('div2') == 0:
-                px, py, pz, comp2 = \
-                    self.ts.get_particle(['ux', 'uy', 'uz', components[1]],iteration=iteration,
-                                         select=select,species=species)
-                comp1 = divergence(px=px, py=py, pz=pz)
-            else:
+            elif '2' in components[1]:
                 px, py, pz, comp1 = \
                     self.ts.get_particle(['ux', 'uy', 'uz', components[0]],iteration=iteration,
                                          select=select,species=species)
-                comp2 = divergence(px=px, py=py, pz=pz)
+                comp2 = divergence(px=px,py=py,pz=pz)
+
         else:
             comp1, comp2 = \
                 self.ts.get_particle([components[0], components[1]],
