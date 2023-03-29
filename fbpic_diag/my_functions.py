@@ -1170,7 +1170,7 @@ class Diag(object):
             You can plot also the 'divergence' method outputs:
              - 'div_x' is for div along planar slice x-z
              - 'div_y' is for div along planar slice y-z
-             - 'div2' is for total div
+             - 'div_2' is for total div
 
         select: dict
             Particle selector
@@ -1221,57 +1221,82 @@ class Diag(object):
         if not charge:
             q = 1
 
-        if 'div' in components[0]:
-            if 'x' in components[0]:
-                px, pz, comp2 = \
-                    self.ts.get_particle(['ux', 'uz', components[1]],iteration=iteration,
-                                         select=select,species=species)
-                comp1 = divergence(px=px, pz=pz)
-            elif 'y' in components[0]:
-                px, pz, comp2 = \
-                    self.ts.get_particle(['uy', 'uz', components[1]],iteration=iteration,
-                                         select=select,species=species)
-                comp1 = divergence(px=px, pz=pz)
-            elif '2' in components[0]:
-                px, py, pz, comp2 = \
-                    self.ts.get_particle(['ux', 'uy', 'uz', components[1]],iteration=iteration,
-                                         select=select,species=species)
-                comp1 = divergence(px=px,py=py,pz=pz)
+        comp = [None,None]
 
-        elif 'div' in components[1]:
-            if 'x' in components[1]:
-                px, pz, comp1 = \
-                    self.ts.get_particle(['ux', 'uz', components[0]],iteration=iteration,
-                                         select=select,species=species)
-                comp2 = divergence(px=px, pz=pz)
-            elif 'y' in components[1]:
-                px, pz, comp1 = \
-                    self.ts.get_particle(['uy', 'uz', components[0]],iteration=iteration,
-                                         select=select,species=species)
-                comp2 = divergence(px=px, pz=pz)
-            elif '2' in components[1]:
-                px, py, pz, comp1 = \
-                    self.ts.get_particle(['ux', 'uy', 'uz', components[0]],iteration=iteration,
-                                         select=select,species=species)
-                comp2 = divergence(px=px,py=py,pz=pz)
+        if len(components) > 2:
+            raise ValueError("List of components must be of length 2!")
 
-        else:
-            comp1, comp2 = \
+        def if_not_div(components):
+            if 'div_' in components[0] or 'div_' in components[1]:
+                return False
+            else:
+                return True
+
+        def where_div(components):
+            if 'div_' in components[0] and 'div_' not in components[1]:
+                return 0
+            elif 'div_' in components[1] and 'div_' not in components[0]:
+                return 1
+            else:
+                return 'both'
+
+        def which_div(components,where):
+            dictio=dict()
+            if where == 'both':
+                for i,div in enumerate(components):
+                    dictio[i] = div.split('_')[1]
+            else:
+                dictio[where] = components[where].split('_')[1]
+            return dictio
+
+        if if_not_div(components):
+            compx, compy = \
                 self.ts.get_particle([components[0], components[1]],
                                      iteration=iteration, select=select,
                                      species=species)
+            comp[0] = compx
+            comp[1] = compy
+        else:
+            dictio = which_div(components,where_div(components))
+            key = list(dictio.keys())
+            values = list(dictio.values())
+            if len(dictio) > 1:
+                px, py, pz = \
+                    self.ts.get_particle(['ux', 'uy', 'uz'],iteration=iteration,
+                                          select=select,species=species)
+                for j,i in enumerate(values):
+                    if i == '2':
+                        compx = divergence(px,py,pz)
+                    elif i == 'x':
+                        compx = divergence(px=px,pz=pz)
+                    else:
+                        compx = divergence(px=py,pz=pz)
+                    comp[j] = compx
+            else:
+                if '2' not in values:
+                    px, pz, compx = \
+                        self.ts.get_particle(['u'+values[0], 'uz',components[key[0]-1]],iteration=iteration,
+                                              select=select,species=species)
+                    comp[key[0]] = divergence(px=px,pz=pz)
+                    comp[key[0]-1] = compx
+                else:
+                    px, py, pz, compx = \
+                        self.ts.get_particle(['ux', 'uy', 'uz',components[key[0]-1]],iteration=iteration,
+                                              select=select,species=species)
+                    comp[key[0]] = divergence(px,py,pz)
+                    comp[key[0]-1] = compx
 
         if 'z' in components and z0:
             if components.index('z') == 0:
-                comp1 += z0
+                comp[0] += z0
             else:
-                comp2 += z0
+                comp[1] += z0
 
         if mask > 1.:
             raise ValueError("mask = {:f} can't be greater than 1.".format(mask))
 
         H, xedge, yedge = \
-            np.histogram2d(comp1*norms[0], comp2*norms[1],
+            np.histogram2d(comp[0]*norms[0], comp[1]*norms[1],
                            bins=bins, weights=weight,
                            density=True)
         H = H.T*q*N_tot
