@@ -194,8 +194,8 @@ class Diag(object):
     def __comoving_selection__(self, i, time, select):
         v_w = self.params['v_window']
         selection = select.copy()
-        selection['z'] = [select['z'][0]+(v_w*(i-time))*1e6,
-                          select['z'][1]+(v_w*(i-time))*1e6]
+        selection['z'] = [select['z'][0]+(v_w*(i-time)),
+                          select['z'][1]+(v_w*(i-time))]
         return selection
 
     def __potential__(self, iteration, theta=0, m='all'):
@@ -1151,7 +1151,7 @@ class Diag(object):
 
     def phase_space_hist(self, species, iteration, components=['z','uz'],
                          select=None, z0=0., norms=[1.,1.], charge=False,
-                         mask=0., **kwargs):
+                         mask=0., output=False, plot=True, **kwargs):
         """
         Method that plots a 2D histogram of the particles phase space.
 
@@ -1190,9 +1190,21 @@ class Diag(object):
 
         mask: float, optional
             A float in [0.,1.] to mask all bins with a value <= mask*max(hist_values).
+        
+        output: bool, optional, default: 'False'
+            If 'True' returns the values of histogram and bins
+            edges; length of bins array is nbins+1 
+            (lefts edges and right edge of the last bin).
+
+        plot: bool, default: 'True'
+            Boolean to turn on plotting
 
         **kwargs:
             keywords passing to plt.pcolormesh().
+
+        **Returns**
+            If output='True' this returns the 2-D arrays of xy-coordinates
+            and the values of the 'histbars' H
 
         """
 
@@ -1301,7 +1313,11 @@ class Diag(object):
                            density=True)
         H = H.T*q*N_tot
         H = np.ma.masked_less_equal(H,mask*H.max())
-        plt.pcolormesh(xedge, yedge, H, cmap=cmap, alpha=alpha,**kwargs)
+
+        if plot:
+            plt.pcolormesh(xedge, yedge, H, cmap=cmap, alpha=alpha,**kwargs)
+        if output:
+            return xedge, yedge, H
     
     def  laser_waist_amplitude_evolution(self, it_window=None):
         """
