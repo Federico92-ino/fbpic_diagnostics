@@ -1069,7 +1069,8 @@ class Diag(object):
         component: str
             Choose a component in .avail_recorded_components
             to do the weighted distibution of that quantity;
-            if 'current', it returns the longitudinal current
+            also 'div_x', 'div_y' and 'div_2' are accepted.
+            If 'current', it returns the longitudinal current
             carried by the specific 'species' versus 'z';
             positive values in Ampere (A). 
 
@@ -1131,6 +1132,24 @@ class Diag(object):
             inv_dz = bins/(z.max()-z.min())
             values = np.abs(pre_values*inv_dz)
             inv_norm_z = 1.
+
+        elif 'div' in component:
+            if '2' in component:
+                ux, uy, uz, q, w = self.ts.get_particle(['ux','uy','uz','charge','w'], iteration=iteration,
+                                                        species=species,select=select)
+                comp = divergence(ux,uy,uz)
+            elif 'x' in component or 'y' in component:
+                coord = component.split('_')[1]
+                ux, uz, q, w = self.ts.get_particle(['u'+coord,'uz','charge','w'],iteration=iteration,
+                                                    species=species,select=select)
+                comp = divergence(px=ux,pz=uz)
+            if not charge:
+                q = 1.
+            pre_values, Bin = np.histogram(comp, bins=bins, weights=q*w*ipp)
+            inv_dz = bins/(comp.max()-comp.min())
+            values = np.abs(pre_values*inv_dz)
+            inv_norm_z = 1/norm_z
+
         else:    
             comp, q, w = self.ts.get_particle([component, 'charge', 'w'], iteration=iteration,
                                         species=species, select=select)
@@ -1143,7 +1162,6 @@ class Diag(object):
         
         if plot:
             _, _, _ = plt.hist(Bin[:-1]*norm_z, Bin*norm_z, weights=values*inv_norm_z, **kwargs)
-            plt.ylim(0.,values.max()*1.05)
             del _
 
         if output:
