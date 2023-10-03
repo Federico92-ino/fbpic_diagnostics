@@ -9,7 +9,6 @@ from openpmd_viewer import OpenPMDTimeSeries
 import json
 from scipy.constants import e, m_e, c, pi
 from scipy.signal import hilbert
-from scipy.signal import hilbert
 
 def divergence(px=None, py=None, pz=None):
 
@@ -189,6 +188,8 @@ class Diag(object):
                 N = m_e*c**2/e
             elif field_name == 'force':
                 N = m_e*omegap*c
+            elif field_name == 'envelope':
+                N = m_e*omega0*c/e
         return N
 
     def __comoving_selection__(self, i, time, select):
@@ -254,6 +255,16 @@ class Diag(object):
             raise ValueError("You must specify a force component in \n"
                              "\t\a 'x', 'y', 'r' or 't' direction for 'coord'")
         return F, info_e
+
+    def __envelope__(self, iteration, m='all'):
+        Ex, info_e = self.ts.get_field('E','x',iteration=iteration,m=m)
+        Ey, info = self.ts.get_field('E','y',iteration=iteration,m=m)
+        EX = np.abs(hilbert(Ex))
+        EY = np.abs(hilbert(Ey))
+        E = np.sqrt(EX**2+EY**2)
+        del info
+        return E, info_e
+
 
     def slice_emit(self, N, select=None, species=None, iteration=None,
                     plot=False, components=['x','ux'], mask=0., trans_space='x',
@@ -609,7 +620,7 @@ class Diag(object):
     def lineout(self, field_name, iteration,
                 coord=None, theta=0, m='all',
                 normalize=False, A0=None, slicing='z',
-                on_axis=None, z0=0., norm_z=1., **kwargs):
+                on_axis=None, z0=0., norm_z=1., output=False, **kwargs):
         """
         Method to get a lineout plot of passed field_name
 
@@ -652,6 +663,9 @@ class Diag(object):
             Constant to multiply x-axis for normalization to be set in meters^-1,
             or changing the order of magnitude (e.g. multiply for 1.e6 to set microns).
 
+        output: bool
+            If True it returns x-axis and field values 
+
         **kwargs: keywords to pass to .pyplot.plot() function
 
         """
@@ -660,6 +674,8 @@ class Diag(object):
             E, info_e = self.__potential__(iteration, theta=theta, m=m)
         elif field_name == 'force':
             E, info_e = self.__force__(coord, iteration, theta, m)
+        elif field_name == 'envelope':
+            E, info_e = self.__envelope__(iteration,m)
         else:
             E, info_e = self.ts.get_field(field=field_name, coord=coord,
                                           iteration=iteration, theta=theta, m=m)
@@ -684,9 +700,12 @@ class Diag(object):
 
         plt.plot(z*norm_z, E/E0, **kwargs)
 
+        if output:
+            return z*norm_z, E/E0
+
     def map(self, field_name, iteration,
             coord=None, theta=0, m='all', normalize=False, A0=None, 
-            z0=0., norms=[1.,1.], **kwargs):
+            z0=0., norms=[1.,1.], output=False, **kwargs):
         """
         Method to get a 2D-map of passed field_name
 
@@ -725,6 +744,9 @@ class Diag(object):
             norms[0] for z-axis, norms[1] for r-axis.
             Set in meters^-1; default is [1.,1.].
 
+        output: bool
+            If True it returns x-axis and field values         
+
         **kwargs: keywords to pass to .Axes.imshow() method
 
         """
@@ -733,6 +755,8 @@ class Diag(object):
             E, info_e = self.__potential__(iteration, theta=theta, m=m)
         elif field_name == 'force':
             E, info_e = self.__force__(coord, iteration, theta, m)
+        elif field_name == 'envelope':
+            E, info_e = self.__envelope__(iteration,m)
         else:
             E, info_e = self.ts.get_field(field=field_name, coord=coord,
                                           iteration=iteration, theta=theta, m=m)
@@ -752,6 +776,8 @@ class Diag(object):
         extent[2:4]*=norms[1]
         plt.imshow(E/E0, extent=extent,
                   origin=origin, **kwargs)
+        if output:
+            return E/E0, extent
 
     def transverse_map(self, field_name, iteration, coord=None,
             m='all', normalize=False, A0=None,
@@ -828,6 +854,9 @@ class Diag(object):
                 field[:,i] = E[Nr:,nz].copy()
             elif field_name == 'force':
                 E = self.__force__(coord, iteration, theta=T, m=m)[0]
+                field[:,i] = E[Nr:,nz].copy()
+            elif field_name == 'envelope':
+                E = self.__envelope__(iteration,m)[0]
                 field[:,i] = E[Nr:,nz].copy()
             else:
                 E = self.ts.get_field(field=field_name, coord=coord,
