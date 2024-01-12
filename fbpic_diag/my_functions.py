@@ -34,9 +34,9 @@ def divergence(px=None, py=None, pz=None):
         Divergence
     """
     if py is not None:
-        div = np.sqrt((px**2+py**2)/pz**2)
+        div = np.arctan(np.sqrt((px**2+py**2))/pz)
     else:
-        div = px/pz
+        div = np.arctan(px/pz)
 
     return div
 
@@ -265,6 +265,25 @@ class Diag(object):
         del info
         return E, info_e
 
+    def __select_by_div__(self,var_list,select,species,iteration=None,t=None):
+        alpha = select.pop('div')
+        assert isinstance(alpha,(float,int)), f"\nInvalid dtype: {type(alpha)};'div' must be a number!"
+        if alpha>pi/2 or alpha<0.:
+            raise ValueError("'div' must be a value in [0.,pi/2]")
+        if len(select) == 0:
+            select = None
+        comp_list = self.ts.get_particle(var_list,species,
+                                         iteration=iteration,select=select,t=t)
+        ux, uy, uz = self.ts.get_particle(['ux','uy','uz'],species,
+                                         iteration=iteration,select=select,t=t)
+        div_array = divergence(ux,uy,uz)
+        mask = np.ma.masked_inside(div_array,0.,alpha).mask 
+        for i in range(len(comp_list)):
+            if len(comp_list[i]) == 1:
+                comp_list[i] = comp_list[i]
+            else:
+                comp_list[i] = comp_list[i][mask]
+        return comp_list
 
     def slice_emit(self, N, select=None, species=None, iteration=None,
                     plot=False, components=['x','ux'], mask=0., trans_space='x',
@@ -283,6 +302,8 @@ class Diag(object):
            - 'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
            - 'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
            - 'uz' : [5., None]  (Particles with uz above 5 mc)
+           - also the key 'div' can be passed as single value in rad to select
+             particles in a cone of aperture 2*div
          - If `select` is a ParticleTracker object
          then it returns particles that have been selected at another
          iteration ; see the docstring of `ParticleTracker` for more info.
@@ -334,7 +355,10 @@ class Diag(object):
         else:
             A = 'x'
             B = 'ux'
-        x, ux, z, w = self.ts.get_particle([A, B, 'z', 'w'], select=select, iteration=iteration, species=species)
+        if select is not None and 'div' in select:
+            x, ux, z, w = self.__select_by_div__([A, B, 'z', 'w'], select=select, iteration=iteration, species=species)
+        else:
+            x, ux, z, w = self.ts.get_particle([A, B, 'z', 'w'], select=select, iteration=iteration, species=species)
         dz = (z.max() - z.min())/N
 
         s_emit = np.zeros(N)
@@ -384,42 +408,78 @@ class Diag(object):
 
             if 'div_x' in components:
                 if components.index('div_x') == 0:
-                    px, pz, comp2, weight = \
-                        self.ts.get_particle(['ux', 'uz', components[1], 'w'], iteration=iteration,
-                                             select=select, species=species)
+                    if select is not None and 'div' in select:
+                        px, pz, comp2, weight = \
+                            self.__select_by_div__(['ux', 'uz', components[1], 'w'], iteration=iteration,
+                                                 select=select, species=species)    
+                    else:
+                        px, pz, comp2, weight = \
+                            self.ts.get_particle(['ux', 'uz', components[1], 'w'], iteration=iteration,
+                                                 select=select, species=species)
                     comp1 = divergence(px=px, pz=pz)
                 else:
-                    px, pz, comp1, weight = \
-                        self.ts.get_particle(['ux', 'uz', components[0], 'w'], iteration=iteration,
-                                             select=select, species=species)
+                    if select is not None and 'div' in select:
+                        px, pz, comp1, weight = \
+                            self.ts.get_particle(['ux', 'uz', components[0], 'w'], iteration=iteration,
+                                                 select=select, species=species)
+                    else:
+                        px, pz, comp1, weight = \
+                            self.ts.get_particle(['ux', 'uz', components[0], 'w'], iteration=iteration,
+                                                 select=select, species=species)
                     comp2 = divergence(px=px, pz=pz)
             elif 'div_y' in components:
                 if components.index('div_y') == 0:
-                    px, pz, comp2, weight = \
-                        self.ts.get_particle(['uy', 'uz', components[1],'w'], iteration=iteration,
-                                             select=select, species=species)
+                    if select is not None and 'div' in select:
+                        px, pz, comp2, weight = \
+                            self.__select_by_div__(['ux', 'uz', components[1], 'w'], iteration=iteration,
+                                                 select=select, species=species)    
+                    else:
+                        px, pz, comp2, weight = \
+                            self.ts.get_particle(['ux', 'uz', components[1], 'w'], iteration=iteration,
+                                                 select=select, species=species)
                     comp1 = divergence(px=px, pz=pz)
                 else:
-                    px, pz, comp1, weight = \
-                        self.ts.get_particle(['uy', 'uz', components[0],'w'], iteration=iteration,
-                                             select=select, species=species)
+                    if select is not None and 'div' in select:
+                        px, pz, comp1, weight = \
+                            self.ts.get_particle(['ux', 'uz', components[0], 'w'], iteration=iteration,
+                                                 select=select, species=species)
+                    else:
+                        px, pz, comp1, weight = \
+                            self.ts.get_particle(['ux', 'uz', components[0], 'w'], iteration=iteration,
+                                                 select=select, species=species)
                     comp2 = divergence(px=px, pz=pz)
             elif 'div2' in components:
-                if components.index('div2') == 0:
-                    px, py, pz, comp2, weight = \
-                        self.ts.get_particle(['ux', 'uy', 'uz', components[1],'w'], iteration=iteration,
-                                             select=select, species=species)
+                if components.index('div_x') == 0:
+                    if select is not None and 'div' in select:
+                        px, py, pz, comp2, weight = \
+                            self.__select_by_div__(['ux', 'uy', 'uz', components[1], 'w'], iteration=iteration,
+                                                 select=select, species=species)    
+                    else:
+                        px, py, pz, comp2, weight = \
+                            self.ts.get_particle(['ux', 'uy', 'uz', components[1], 'w'], iteration=iteration,
+                                                 select=select, species=species)
                     comp1 = divergence(px=px, py=py, pz=pz)
                 else:
-                    px, py, pz, comp1, weight = \
-                        self.ts.get_particle(['ux', 'uy', 'uz', components[0],'w'], iteration=iteration,
-                                             select=select, species=species)
+                    if select is not None and 'div' in select:
+                        px, py, pz, comp1, weight = \
+                            self.ts.get_particle(['ux', 'uy', 'uz', components[0], 'w'], iteration=iteration,
+                                                 select=select, species=species)
+                    else:
+                        px, py, pz, comp1, weight = \
+                            self.ts.get_particle(['ux', 'uy', 'uz', components[0], 'w'], iteration=iteration,
+                                                 select=select, species=species)
                     comp2 = divergence(px=px, py=py, pz=pz)
             else:
-                comp1, comp2, weight = \
-                    self.ts.get_particle([components[0], components[1], 'w'],
-                                         iteration=iteration, select=select,
-                                         species=species)
+                if select is not None and 'div' in select:
+                    comp1, comp2, weight = \
+                        self.__select_by_div__([components[0], components[1], 'w'],
+                                             iteration=iteration, select=select,
+                                             species=species)
+                else:    
+                    comp1, comp2, weight = \
+                        self.ts.get_particle([components[0], components[1], 'w'],
+                                             iteration=iteration, select=select,
+                                             species=species)
 
             if 'z' in components and z0:
                 if components.index('z') == 0:
@@ -484,6 +544,8 @@ class Diag(object):
            - 'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
            - 'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
            - 'uz' : [5., None]  (Particles with uz above 5 mc)
+           - also the key 'div' can be passed as single value in rad to select
+             particles in a cone of aperture 2*div
          - If `select` is a ParticleTracker object:
          then it returns particles that have been selected at another
          iteration ; see the docstring of `ParticleTracker` for more info.
@@ -515,7 +577,10 @@ class Diag(object):
         Z=np.zeros_like(a)
         ptcl_percent = self.params['subsampling_fraction']
         for i,t in enumerate(self.iterations):
-            z, w = self.ts.get_particle(['z','w'], select=select, iteration=t, species=species)
+            if select is not None and 'div' in select:
+                z, w = self.__select_by_div__(['z','w'], select=select, iteration=t, species=species)
+            else:
+                z, w = self.ts.get_particle(['z','w'], select=select, iteration=t, species=species)
             z_mean = mean(z,w)
             sigma_z = central_average(z,w)
             for j,n in enumerate(n_slice):
@@ -525,21 +590,30 @@ class Diag(object):
                     selection = select.copy()
                     selection['z'] = [z_mean+n*sigma_z-dz/2,z_mean+n*sigma_z+dz/2]
                 if prop == 'beam_size':
-                    x = self.ts.get_particle([A], species=species, select=selection, iteration=t)[0]
+                    if selection is not None and 'div' in selection:
+                        x = self.__select_by_div__([A], species=species, select=selection, iteration=t)[0]
+                    else:
+                        x = self.ts.get_particle([A], species=species, select=selection, iteration=t)[0]
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     a[j,i] = central_average(x,W)
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'momenta_spread':
-                    x = self.ts.get_particle([B], species=species, select=selection, iteration=t)[0]
+                    if selection is not None and 'div' in selection:
+                        x = self.__select_by_div__([B], species=species, select=selection, iteration=t)[0]
+                    else:
+                        x = self.ts.get_particle([B], species=species, select=selection, iteration=t)[0]                    
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     a[j,i] = central_average(x,W)
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'divergence':
-                    ux, uz = self.ts.get_particle([B,'uz'], species=species, select=selection, iteration=t)
+                    if selection is not None and 'div' in selection:
+                        ux, uz = self.__select_by_div__([B,'uz'], species=species, select=selection, iteration=t)
+                    else:
+                        ux, uz = self.ts.get_particle([B,'uz'], species=species, select=selection, iteration=t)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     slope = divergence(px=ux,pz=uz)
@@ -547,7 +621,10 @@ class Diag(object):
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'solid_div':
-                    ux, uy, uz = self.ts.get_particle(['x','uy','uz'], species=species, select=selection, iteration=t)
+                    if selection is not None and 'div' in selection:
+                        ux, uy, uz = self.__select_by_div__(['x','uy','uz'], species=species, select=selection, iteration=t)
+                    else:                                            
+                        ux, uy, uz = self.ts.get_particle(['x','uy','uz'], species=species, select=selection, iteration=t)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     slope = divergence(px=ux,py=uy,pz=uz)
@@ -555,21 +632,30 @@ class Diag(object):
                     Z[j,i] = z_mean+n*sigma_z                
                     continue
                 if prop == 'ph_emit_n':
-                    x, ux = self.ts.get_particle([A,B], species=species, select=selection, iteration=t)
+                    if selection is not None and 'div' in selection:
+                        x, ux = self.__select_by_div__([A,B], species=species, select=selection, iteration=t)
+                    else:                        
+                        x, ux = self.ts.get_particle([A,B], species=species, select=selection, iteration=t)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     a[j,i] = emittance(x, ux, W)
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'mean_energy':
-                    gamma = self.ts.get_particle(['gamma'], species=species, select=selection, iteration=t)[0]
+                    if selection is not None and 'div' in selection:
+                        gamma = self.__select_by_div__(['gamma'], species=species, select=selection, iteration=t)[0]
+                    else:                        
+                        gamma = self.ts.get_particle(['gamma'], species=species, select=selection, iteration=t)[0]
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     a[j,i] = mean(gamma, W, energy=True)
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'en_spread':
-                    gamma = self.ts.get_particle(['gamma'], species=species, select=selection, iteration=t)[0]
+                    if selection is not None and 'div' in selection:
+                        gamma = self.__select_by_div__(['gamma'], species=species, select=selection, iteration=t)[0]
+                    else:                        
+                        gamma = self.ts.get_particle(['gamma'], species=species, select=selection, iteration=t)[0]
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     a[j,i] = energy_spread(gamma,W)
@@ -587,7 +673,10 @@ class Diag(object):
                         Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'tr_emit':
-                    x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
+                    if selection is not None and 'div' in selection:
+                        x, ux, uz = self.__select_by_div__([A,B,'uz'], iteration=t, select=selection, species=species)
+                    else:                        
+                        x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
                     slope = divergence(px=ux, pz=uz)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
@@ -595,21 +684,30 @@ class Diag(object):
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'tw_alpha':
-                    x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
+                    if selection is not None and 'div' in selection:
+                        x, ux, uz = self.__select_by_div__([A,B,'uz'], iteration=t, select=selection, species=species)
+                    else:                        
+                        x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     a[j,i] = twiss(x, ux, uz, W, 'alpha')
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'tw_beta':
-                    x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
+                    if selection is not None and 'div' in selection:
+                        x, ux, uz = self.__select_by_div__([A,B,'uz'], iteration=t, select=selection, species=species)
+                    else:                        
+                        x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     a[j,i] = twiss(x, ux, uz, W, 'beta')
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'tw_gamma':
-                    x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
+                    if selection is not None and 'div' in selection:
+                        x, ux, uz = self.__select_by_div__([A,B,'uz'], iteration=t, select=selection, species=species)
+                    else:                        
+                        x, ux, uz = self.ts.get_particle([A,B,'uz'], iteration=t, select=selection, species=species)
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     a[j,i] = twiss(x, ux, uz, W, 'gamma')
@@ -894,6 +992,8 @@ class Diag(object):
              'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
              'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
              'uz' : [5., None]  (Particles with uz above 5 mc)
+             - also the key 'div' can be passed as single value in rad to select
+             particles in a cone of aperture 2*div
              - If `select` is a ParticleTracker object:
              then it returns particles that have been selected at another
              iteration ; see the docstring of `ParticleTracker` for more info.
@@ -967,7 +1067,10 @@ class Diag(object):
             B = 'ux'
 
         if property == 'charge':
-            q = self.ts.get_particle(['charge'], t=t[-1], select=select, species=species)[0]
+            if select is not None and 'div' in select:
+                q = self.__select_by_div__(['charge'], t=t[-1], select=select, species=species)[0]
+            else:
+                q = self.ts.get_particle(['charge'], t=t[-1], select=select, species=species)[0]
         
         if property not in self.avail_bunch_prop:
             prop = '\n -'.join(self.avail_bunch_prop)
@@ -975,38 +1078,57 @@ class Diag(object):
                              "Available properties are:\n -{:s}\nTry again".format(prop))
         else:
             if zeta_coord and isinstance(select,dict) and ('z' in select):
-
                 if time != 0.:
                     time = time
                 else:
                     time = self.t[0]
-
                 for k, i in enumerate(t):
                     selection = self.__comoving_selection__(i, time, select)
-                    z, w = self.ts.get_particle(['z', 'w'],
+                    if selection is not None and 'div' in selection:
+                        z, w = self.__select_by_div__(['z', 'w'],
                                              t=i, select=selection,
                                              species=species)
+                    else:                        
+                        z, w = self.ts.get_particle(['z', 'w'],
+                                                 t=i, select=selection,
+                                                 species=species)
                     Z[k] = mean(z,w)
                     if property == 'ph_emit_n':
-                        x, ux = self.ts.get_particle([A, B],t=i,
+                        if selection is not None and 'div' in selection:
+                            x, ux = self.__select_by_div__([A, B],t=i,
                                 select=selection,species=species)                        
+                        else:    
+                            x, ux = self.ts.get_particle([A, B],t=i,
+                                    select=selection,species=species)                        
                         a[k] = emittance(x, ux, w)
                         continue
                     elif property == 'beam_size':
-                        x = self.ts.get_particle([A], t=i, select=selection, species=species)[0]
+                        if selection is not None and 'div' in selection:
+                            x = self.__select_by_div__([A], t=i, select=selection, species=species)[0]
+                        else:
+                            x = self.ts.get_particle([A], t=i, select=selection, species=species)[0]
                         a[k] = central_average(x, w)
                         continue
                     elif property == 'momenta_spread':
-                        ux = self.ts.get_particle([B], t=i, select=selection, species=species)[0]
+                        if selection is not None and 'div' in selection:
+                            ux = self.__select_by_div__([B], t=i, select=selection, species=species)[0]
+                        else:                            
+                            ux = self.ts.get_particle([B], t=i, select=selection, species=species)[0]
                         a[k] = central_average(ux, w)
                         continue
                     elif property == 'divergence':
-                        ux, uz = self.ts.get_particle([B,'uz'], t=i, select=selection, species=species)
+                        if selection is not None and 'div' in selection:
+                            ux, uz = self.__select_by_div__([B,'uz'], t=i, select=selection, species=species)
+                        else:                            
+                            ux, uz = self.ts.get_particle([B,'uz'], t=i, select=selection, species=species)
                         slope = divergence(px=ux,pz=uz)
                         a[k] = central_average(slope,w)
                         continue
                     elif property == 'solid_div':
-                        ux, uy, uz = self.ts.get_particle(['ux','uy','uz'], t=i, select=selection, species=species)
+                        if selection is not None and 'div' in selection:
+                            ux, uy, uz = self.__select_by_div__(['ux','uy','uz'], t=i, select=selection, species=species)
+                        else:                            
+                            ux, uy, uz = self.ts.get_particle(['ux','uy','uz'], t=i, select=selection, species=species)
                         solid = divergence(ux,uy,uz)
                         a[k] = central_average(solid,w)
                         continue
@@ -1017,47 +1139,80 @@ class Diag(object):
                             a[k] = q*w.sum()*inv_ptcl_percent
                         continue
                     elif property == 'mean_energy':
-                        gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
+                        if selection is not None and 'div' in selection:
+                            gamma = self.__select_by_div__(['gamma'], t=i, select=selection, species=species)[0]
+                        else:                                
+                            gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
                         a[k] = mean(gamma,w,energy=True)
                         continue
                     elif property == 'en_spread':
-                        gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
+                        if selection is not None and 'div' in selection:
+                            gamma = self.__select_by_div__(['gamma'], t=i, select=selection, species=species)[0]
+                        else:                            
+                            gamma = self.ts.get_particle(['gamma'], t=i, select=selection, species=species)[0]
                         a[k] = energy_spread(gamma, w)
                         continue
                     elif property == 'tr_emit':
-                        x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                        if selection is not None and 'div' in selection:
+                            x, ux, uz = self.__select_by_div__([A,B,'uz'], t=i, select=selection, species=species)
+                        else:                            
+                            x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
                         slope = divergence(px=ux, pz=uz)
                         a[k] = emittance(x, slope, w)
                         continue
                     elif property in ['tw_alpha','tw_beta','tw_gamma']:
-                        x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
+                        if selection is not None and 'div' in selection:
+                            x, ux, uz = self.__select_by_div__([A,B,'uz'], t=i, select=selection, species=species)
+                        else:                            
+                            x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=selection, species=species)
                         a[k] = twiss(x, ux, uz, w, property.remove('tw_',''))
             else:
                 for k, i in enumerate(t):
-                    z, w = self.ts.get_particle(['z', 'w'],
-                     t=i, select=select,
-                     species=species)
+                    if select is not None and 'div' in select:
+                        z, w = self.__select_by_div__(['z', 'w'],
+                                             t=i, select=select,
+                                             species=species)
+                    else:                        
+                        z, w = self.ts.get_particle(['z', 'w'],
+                                                 t=i, select=select,
+                                                 species=species)
                     Z[k] = mean(z,w)
                     if property == 'ph_emit_n':
-                        x, ux = self.ts.get_particle([A, B],t=i,
+                        if select is not None and 'div' in select:
+                            x, ux = self.__select_by_div__([A, B],t=i,
                                 select=select,species=species)                        
+                        else:    
+                            x, ux = self.ts.get_particle([A, B],t=i,
+                                    select=select,species=species)                        
                         a[k] = emittance(x, ux, w)
                         continue
                     elif property == 'beam_size':
-                        x = self.ts.get_particle([A], t=i, select=select, species=species)[0]
+                        if select is not None and 'div' in select:
+                            x = self.__select_by_div__([A], t=i, select=select, species=species)[0]
+                        else:
+                            x = self.ts.get_particle([A], t=i, select=select, species=species)[0]
                         a[k] = central_average(x, w)
                         continue
                     elif property == 'momenta_spread':
-                        ux = self.ts.get_particle([B], t=i, select=select, species=species)[0]
+                        if select is not None and 'div' in select:
+                            ux = self.__select_by_div__([B], t=i, select=select, species=species)[0]
+                        else:                            
+                            ux = self.ts.get_particle([B], t=i, select=select, species=species)[0]
                         a[k] = central_average(ux, w)
                         continue
                     elif property == 'divergence':
-                        ux, uz = self.ts.get_particle([B,'uz'], t=i, select=select, species=species)
+                        if select is not None and 'div' in select:
+                            ux, uz = self.__select_by_div__([B,'uz'], t=i, select=select, species=species)
+                        else:                            
+                            ux, uz = self.ts.get_particle([B,'uz'], t=i, select=select, species=species)
                         slope = divergence(px=ux,pz=uz)
                         a[k] = central_average(slope,w)
                         continue
                     elif property == 'solid_div':
-                        ux, uy, uz = self.ts.get_particle(['ux','uy','uz'], t=i, select=select, species=species)
+                        if select is not None and 'div' in select:
+                            ux, uy, uz = self.__select_by_div__(['ux','uy','uz'], t=i, select=select, species=species)
+                        else:                            
+                            ux, uy, uz = self.ts.get_particle(['ux','uy','uz'], t=i, select=select, species=species)
                         solid = divergence(ux,uy,uz)
                         a[k] = central_average(solid,w)
                         continue
@@ -1068,21 +1223,33 @@ class Diag(object):
                             a[k] = q*w.sum()*inv_ptcl_percent
                         continue
                     elif property == 'mean_energy':
-                        gamma = self.ts.get_particle(['gamma'], t=i, select=select, species=species)[0]
+                        if select is not None and 'div' in select:
+                            gamma = self.__select_by_div__(['gamma'], t=i, select=select, species=species)[0]
+                        else:                                
+                            gamma = self.ts.get_particle(['gamma'], t=i, select=select, species=species)[0]
                         a[k] = mean(gamma,w,energy=True)
                         continue
                     elif property == 'en_spread':
-                        gamma = self.ts.get_particle(['gamma'], t=i, select=select, species=species)[0]
+                        if select is not None and 'div' in select:
+                            gamma = self.__select_by_div__(['gamma'], t=i, select=select, species=species)[0]
+                        else:                            
+                            gamma = self.ts.get_particle(['gamma'], t=i, select=select, species=species)[0]
                         a[k] = energy_spread(gamma, w)
                         continue
                     elif property == 'tr_emit':
-                        x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=select, species=species)
+                        if select is not None and 'div' in select:
+                            x, ux, uz = self.__select_by_div__([A,B,'uz'], t=i, select=select, species=species)
+                        else:                            
+                            x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=select, species=species)
                         slope = divergence(px=ux, pz=uz)
                         a[k] = emittance(x, slope, w)
                         continue
                     elif property in ['tw_alpha','tw_beta','tw_gamma']:
-                        x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=select, species=species)
-                        a[k] = twiss(x, ux, uz, w, property.replace('tw_',''))
+                        if select is not None and 'div' in select:
+                            x, ux, uz = self.__select_by_div__([A,B,'uz'], t=i, select=select, species=species)
+                        else:                            
+                            x, ux, uz = self.ts.get_particle([A,B,'uz'], t=i, select=select, species=species)
+                        a[k] = twiss(x, ux, uz, w, property.remove('tw_',''))
             if output:
                 return Z, a
             if plot:
@@ -1134,7 +1301,7 @@ class Diag(object):
 
             values, bins: np.arrays
                 If 'output' is True, arrays with bins values and bins edges in MKS units,
-                regardless of 'norm_z' factor.
+                regardless of 'norm_z' factor.sim.avail_record_components
             The plotted graph returns dN(dQ)/dcomp vs comp with axis units according to norm_z;
             in case of 'current', it's returned in Ampere vs z.
 
@@ -1154,23 +1321,34 @@ class Diag(object):
             del kwargs['bins']
 
         if component == 'current':
-            z, uz, gamma, q, w = self.ts.get_particle(['z','uz','gamma','charge','w'], iteration=iteration,
-                                                    species=species, select=select)
+            if select is not None and 'div' in select:
+                z, uz, gamma, q, w = self.__select_by_div__(['z','uz','gamma','charge','w'],
+                                                            iteration=iteration, species=species, select=select)
+            else:                
+                z, uz, gamma, q, w = self.ts.get_particle(['z','uz','gamma','charge','w'],
+                                                          iteration=iteration, species=species, select=select)
             vz = c*uz/gamma
             pre_values, Bin = np.histogram(z, bins=bins, weights=q*vz*w*ipp)
             inv_dz = bins/(z.max()-z.min())
             values = np.abs(pre_values*inv_dz)
             inv_norm_z = 1.
-
         elif 'div' in component:
             if '2' in component:
-                ux, uy, uz, q, w = self.ts.get_particle(['ux','uy','uz','charge','w'], iteration=iteration,
-                                                        species=species,select=select)
+                if select is not None and 'div' in select:
+                    ux, uy, uz, q, w = self.__select_by_div__(['ux','uy','uz','charge','w'],
+                                                              iteration=iteration, species=species,select=select)
+                else:
+                    ux, uy, uz, q, w = self.ts.get_particle(['ux','uy','uz','charge','w'],
+                                                            iteration=iteration, species=species,select=select)
                 comp = divergence(ux,uy,uz)
             elif 'x' in component or 'y' in component:
                 coord = component.split('_')[1]
-                ux, uz, q, w = self.ts.get_particle(['u'+coord,'uz','charge','w'],iteration=iteration,
-                                                    species=species,select=select)
+                if select is not None and 'div' in select:
+                    ux, uz, q, w = self.__select_by_div__(['u'+coord,'uz','charge','w'],
+                                                          iteration=iteration, species=species,select=select)
+                else:
+                    ux, uz, q, w = self.ts.get_particle(['u'+coord,'uz','charge','w'],
+                                                        iteration=iteration, species=species,select=select)
                 comp = divergence(px=ux,pz=uz)
             if not charge:
                 q = 1.
@@ -1178,10 +1356,13 @@ class Diag(object):
             inv_dz = bins/(comp.max()-comp.min())
             values = np.abs(pre_values*inv_dz)
             inv_norm_z = 1/norm_z
-
-        else:    
-            comp, q, w = self.ts.get_particle([component, 'charge', 'w'], iteration=iteration,
-                                        species=species, select=select)
+        else:
+            if select is not None and 'div' in select:
+                comp, q, w = self.__select_by_div__([component, 'charge', 'w'],
+                                                    iteration=iteration, species=species, select=select)
+            else:                
+                comp, q, w = self.ts.get_particle([component, 'charge', 'w'],
+                                                  iteration=iteration, species=species, select=select)
             if not charge:
                 q = 1.
             pre_values, Bin = np.histogram(comp, bins=bins, weights=q*w*ipp)
@@ -1259,10 +1440,7 @@ class Diag(object):
         cmap = 'Reds'
         bins = 1000
         alpha = 1
-
-        q, weight = self.ts.get_particle(['charge', 'w'],iteration=iteration,
-                                         select=select,species=species)
-        N_tot = weight.sum()*inv_ptcl_percent
+        q, = self.ts.get_particle(['charge'],iteration=iteration, select=None,species=species)
         q = np.abs(q)
         
         if 'cmap' in kwargs:
@@ -1309,10 +1487,16 @@ class Diag(object):
             return dictio
 
         if if_not_div(components):
-            compx, compy = \
-                self.ts.get_particle([components[0], components[1]],
-                                     iteration=iteration, select=select,
-                                     species=species)
+            if select is not None and 'div' in select:
+                compx, compy, weight = \
+                self.__select_by_div__([components[0], components[1],'w'],
+                                       iteration=iteration, select=select,
+                                       species=species)
+            else:
+                compx, compy, weight = \
+                    self.ts.get_particle([components[0], components[1],'w'],
+                                         iteration=iteration, select=select,
+                                         species=species)
             comp[0] = compx
             comp[1] = compy
         else:
@@ -1320,9 +1504,14 @@ class Diag(object):
             key = list(dictio.keys())
             values = list(dictio.values())
             if len(dictio) > 1:
-                px, py, pz = \
-                    self.ts.get_particle(['ux', 'uy', 'uz'],iteration=iteration,
-                                          select=select,species=species)
+                if select is not None and 'div' in select:
+                    px, py, pz, weight = \
+                        self.__select_by_div__(['ux', 'uy', 'uz','w'],iteration=iteration,
+                                                select=select,species=species)
+                else:    
+                    px, py, pz = \
+                        self.ts.get_particle(['ux', 'uy', 'uz', 'w'],iteration=iteration,
+                                              select=select,species=species)
                 for j,i in enumerate(values):
                     if i == '2':
                         compx = divergence(px,py,pz)
@@ -1333,15 +1522,25 @@ class Diag(object):
                     comp[j] = compx
             else:
                 if '2' not in values:
-                    px, pz, compx = \
-                        self.ts.get_particle(['u'+values[0], 'uz',components[key[0]-1]],iteration=iteration,
-                                              select=select,species=species)
+                    if select is not None and 'div' in select:
+                        px, pz, compx, weight = \
+                            self.__select_by_div__(['u'+values[0], 'uz',components[key[0]-1],'w'],iteration=iteration,
+                                                    select=select,species=species)
+                    else:
+                        px, pz, compx, weight = \
+                            self.ts.get_particle(['u'+values[0], 'uz',components[key[0]-1],'w'],iteration=iteration,
+                                                  select=select,species=species)
                     comp[key[0]] = divergence(px=px,pz=pz)
                     comp[key[0]-1] = compx
                 else:
-                    px, py, pz, compx = \
-                        self.ts.get_particle(['ux', 'uy', 'uz',components[key[0]-1]],iteration=iteration,
-                                              select=select,species=species)
+                    if select is not None and 'div' in select:
+                        px, py, pz, compx, weight = \
+                            self.__select_by_div__(['ux', 'uy', 'uz',components[key[0]-1],'w'],iteration=iteration,
+                                                    select=select,species=species)
+                    else:
+                        px, py, pz, compx, weight = \
+                            self.ts.get_particle(['ux', 'uy', 'uz',components[key[0]-1],'w'],iteration=iteration,
+                                                  select=select,species=species)
                     comp[key[0]] = divergence(px,py,pz)
                     comp[key[0]-1] = compx
 
@@ -1358,6 +1557,7 @@ class Diag(object):
             np.histogram2d(comp[0]*norms[0], comp[1]*norms[1],
                            bins=bins, weights=weight,
                            density=True)
+        N_tot = weight.sum()*inv_ptcl_percent
         H = H.T*q*N_tot
         H = np.ma.masked_less_equal(H,mask*H.max())
 
