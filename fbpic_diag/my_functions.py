@@ -266,19 +266,23 @@ class Diag(object):
         return E, info_e
 
     def __select_by_div__(self,var_list,select,species,iteration=None,t=None):
-        alpha = select.pop('div')
+        alpha = select['div']
         assert isinstance(alpha,(float,int)), f"\nInvalid dtype: {type(alpha)};'div' must be a number!"
         if alpha>pi/2 or alpha<0.:
             raise ValueError("'div' must be a value in [0.,pi/2]")
         # 'select' cleansing
         if 'ptcl_tracker' in select:
-            select = select['ptcl_tracker']
+            selection = select['ptcl_tracker']
         elif len(select) == 0:
-            select = None
+            selection = None
+        else:
+            selection = select.copy()
+            _ = selection.pop('div')
+            del _
         comp_list = self.ts.get_particle(var_list,species,
-                                         iteration=iteration,select=select,t=t)
+                                         iteration=iteration,select=selection,t=t)
         ux, uy, uz = self.ts.get_particle(['ux','uy','uz'],species,
-                                         iteration=iteration,select=select,t=t)
+                                         iteration=iteration,select=selection,t=t)
         div_array = divergence(ux,uy,uz)
         mask = np.ma.masked_inside(div_array,0.,alpha).mask 
         for i in range(len(comp_list)):
