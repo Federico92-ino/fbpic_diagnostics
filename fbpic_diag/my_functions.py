@@ -5,7 +5,7 @@ Set of functions by FA
 # Import section
 import numpy as np
 import matplotlib.pyplot as plt
-from openpmd_viewer import OpenPMDTimeSeries
+from openpmd_viewer import OpenPMDTimeSeries, ParticleTracker
 import json
 from scipy.constants import e, m_e, c, pi
 from scipy.signal import hilbert
@@ -145,7 +145,6 @@ def energy_spread(gamma, w):
     sigma = average/mean
     return sigma
 
-
 class Diag(object):
 
     """
@@ -271,25 +270,37 @@ class Diag(object):
         if alpha>pi/2 or alpha<0.:
             raise ValueError("'div' must be a value in [0.,pi/2]")
         # 'select' cleansing
-        if 'ptcl_tracker' in select:
-            selection = select['ptcl_tracker']
-        elif len(select) == 0:
-            selection = None
-        else:
-            selection = select.copy()
-            _ = selection.pop('div')
-            del _
-        comp_list = self.ts.get_particle(var_list,species,
-                                         iteration=iteration,select=selection,t=t)
-        ux, uy, uz = self.ts.get_particle(['ux','uy','uz'],species,
-                                         iteration=iteration,select=selection,t=t)
-        div_array = divergence(ux,uy,uz)
-        mask = np.ma.masked_inside(div_array,0.,alpha).mask 
-        for i in range(len(comp_list)):
-            if len(comp_list[i]) == 1:
-                comp_list[i] = comp_list[i]
+        if 'ptcl_tracking' in select and select['ptcl_tracking']:
+            assert 'track_it' in select,\
+                    '\nYou need to pass the reference iteration for particle tracking'
+            assert 'select' in select and  (isinstance(select['select'],dict) or select['select'] is None),\
+                    "\nYou need to pass a dictionary or 'None' to 'select' key when 'ptcl_tracking' is on"
+            ux, uy, uz, id = self.ts.get_particle(['ux','uy','uz','id'],species,select=select['select'],
+                                             iteration=select['track_it'])
+            div_array = divergence(ux,uy,uz)
+            mask = np.ma.masked_inside(div_array,0.,alpha).mask
+            id = id[mask] 
+            pt = ParticleTracker(self.ts,species,iteration=select['track_it'], select=id)
+            comp_list = self.ts.get_particle(var_list,species,select=pt,
+                                             iteration=iteration,t=t)
+        else:    
+            if len(select) == 1:
+                selection = None
             else:
-                comp_list[i] = comp_list[i][mask]
+                selection = select.copy()
+                _ = selection.pop('div')
+                del _
+            comp_list = self.ts.get_particle(var_list,species,select=selection,
+                                             iteration=iteration,t=t)
+            ux, uy, uz = self.ts.get_particle(['ux','uy','uz'],species,select=selection,
+                                             iteration=iteration,t=t)
+            div_array = divergence(ux,uy,uz)
+            mask = np.ma.masked_inside(div_array,0.,alpha).mask 
+            for i in range(len(comp_list)):
+                if len(comp_list[i]) == 1:
+                    comp_list[i] = comp_list[i]
+                else:
+                    comp_list[i] = comp_list[i][mask]
         return comp_list
 
     def slice_emit(self, N, select=None, species=None, iteration=None,
