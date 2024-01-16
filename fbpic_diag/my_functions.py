@@ -1212,7 +1212,7 @@ class Diag(object):
                         else:                            
                             ux, z, w = self.ts.get_particle([B,'z','w'], t=i, select=select, species=species)
                         a[k] = central_average(ux, w)
-                        Z[k] =mean(z,x)
+                        Z[k] =mean(z,w)
                         continue
                     elif property == 'divergence':
                         if select is not None and 'div' in select:
@@ -1221,7 +1221,7 @@ class Diag(object):
                             ux, uz, z, w = self.ts.get_particle([B,'uz','z','w'], t=i, select=select, species=species)
                         slope = divergence(px=ux,pz=uz)
                         a[k] = central_average(slope,w)
-                        Z[k] =mean(z,x)
+                        Z[k] =mean(z,w)
                         continue
                     elif property == 'solid_div':
                         if select is not None and 'div' in select:
@@ -1230,7 +1230,7 @@ class Diag(object):
                             ux, uy, uz, z, w = self.ts.get_particle(['ux','uy','uz','z','w'], t=i, select=select, species=species)
                         solid = divergence(ux,uy,uz)
                         a[k] = central_average(solid,w)
-                        Z[k] =mean(z,x)
+                        Z[k] =mean(z,w)
                         continue
                     elif property == 'charge':
                         if select is not None and 'div' in select:
@@ -1241,7 +1241,7 @@ class Diag(object):
                             a[k] = float('nan')
                         else:
                             a[k] = q*w.sum()*inv_ptcl_percent
-                        Z[k] =mean(z,x)
+                        Z[k] =mean(z,w)
                         continue
                     elif property == 'mean_energy':
                         if select is not None and 'div' in select:
@@ -1249,7 +1249,7 @@ class Diag(object):
                         else:                                
                             gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
                         a[k] = mean(gamma,w,energy=True)
-                        Z[k] =mean(z,x)
+                        Z[k] =mean(z,w)
                         continue
                     elif property == 'en_spread':
                         if select is not None and 'div' in select:
@@ -1257,7 +1257,7 @@ class Diag(object):
                         else:                            
                             gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
                         a[k] = energy_spread(gamma, w)
-                        Z[k] =mean(z,x)
+                        Z[k] =mean(z,w)
                         continue
                     elif property == 'tr_emit':
                         if select is not None and 'div' in select:
@@ -1266,7 +1266,7 @@ class Diag(object):
                             x, ux, uz, z, w = self.ts.get_particle([A,B,'uz','z','w'], t=i, select=select, species=species)
                         slope = divergence(px=ux, pz=uz)
                         a[k] = emittance(x, slope, w)
-                        Z[k] =mean(z,x)
+                        Z[k] =mean(z,w)
                         continue
                     elif property in ['tw_alpha','tw_beta','tw_gamma']:
                         if select is not None and 'div' in select:
@@ -1274,6 +1274,7 @@ class Diag(object):
                         else:                            
                             x, ux, uz, z, w = self.ts.get_particle([A,B,'uz','z','w'], t=i, select=select, species=species)
                         a[k] = twiss(x, ux, uz, w, property.remove('tw_',''))
+                        Z[k] = mean(z,w)
             if output:
                 return Z, a
             if plot:
