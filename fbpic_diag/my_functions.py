@@ -279,8 +279,12 @@ class Diag(object):
                                              iteration=select['track_it'])
             div_array = divergence(ux,uy,uz)
             mask = np.ma.masked_inside(div_array,0.,alpha).mask
-            id = id[mask] 
-            pt = ParticleTracker(self.ts,species,iteration=select['track_it'], select=id)
+            id = id[mask]
+            if 'preserve_indx' in select:
+                preserve_indx = select['preserve_indx']
+            else:
+                preserve_indx = False
+            pt = ParticleTracker(self.ts,species,iteration=select['track_it'], select=id,preserve_particle_index=preserve_indx)
             comp_list = self.ts.get_particle(var_list,species,select=pt,
                                              iteration=iteration,t=t)
         else:    
