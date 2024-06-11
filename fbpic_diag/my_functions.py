@@ -1073,7 +1073,9 @@ class Diag(object):
         **kwargs: keyword to pass to .pyplot.plot()
 
         """
-        inv_ptcl_percent = 1/self.params['subsampling_fraction']
+        if species is None:
+            species = self.avail_species[0]
+        inv_ptcl_percent = 1/self.params['subsampling_fraction'][species]
         if not t_lim:
             t_lim = [self.t.min(), self.t.max()]
         inds = np.where((self.t >= t_lim[0]) & (self.t <= t_lim[1]))
@@ -1335,8 +1337,10 @@ class Diag(object):
             in case of 'current', it's returned in Ampere vs z.
 
         """
+        if species is None:
+            species = self.avail_species[0]
 
-        ipp = 1/self.params['subsampling_fraction']
+        ipp = 1/self.params['subsampling_fraction'][species]
         bins = 300
 
         if 'density' in kwargs:
@@ -1464,8 +1468,10 @@ class Diag(object):
             and the values of the 'histbars' H
 
         """
+        if species is None:
+            species = self.avail_species[0]
+        inv_ptcl_percent = 1/self.params['subsampling_fraction'][species]
 
-        inv_ptcl_percent = 1/self.params['subsampling_fraction']
         cmap = 'Reds'
         bins = 1000
         alpha = 1
