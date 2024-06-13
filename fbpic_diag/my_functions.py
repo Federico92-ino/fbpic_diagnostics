@@ -1544,7 +1544,7 @@ class Diag(object):
                         self.__select_by_div__(['ux', 'uy', 'uz','w'],iteration=iteration,
                                                 select=select,species=species)
                 else:    
-                    px, py, pz = \
+                    px, py, pz, weight = \
                         self.ts.get_particle(['ux', 'uy', 'uz', 'w'],iteration=iteration,
                                               select=select,species=species)
                 for j,i in enumerate(values):
