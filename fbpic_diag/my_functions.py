@@ -9,141 +9,7 @@ from openpmd_viewer import OpenPMDTimeSeries, ParticleTracker
 import json
 from scipy.constants import e, m_e, c, pi
 from scipy.signal import hilbert
-
-def divergence(px=None, py=None, pz=None):
-
-    """
-    Function that computes the bunch divergence,
-    either along a planar slice (div = px/pz) or the
-    total divergence as sqrt((px**2+py**2)/pz**2)
-
-    Parameters
-    --------
-    px: np.array
-        Transverse momentum along the first direction
-    py: np.array
-        Transverse momentum along the second direction.
-        If None it distinguish between the planar divergence and
-        the solid one
-    pz: np.array
-        Longitudinal momentum
-
-    Returns
-    --------
-    div: np.array
-        Divergence
-    """
-    if py is not None:
-        div = np.arctan(np.sqrt((px**2+py**2))/pz)
-    else:
-        div = np.arctan(px/pz)
-
-    return div
-
-def central_average(x, w):
-
-    """
-    Function to calculate the second order momentum of quantity x
-    with w-distribution.
-    **Parameters**
-    x: 1darrays of particles' phase space coord
-    w: ndarray of particles' weights
-    **Returns**
-    average: float
-    """
-    x_mean = np.ma.average(x, weights=w)
-    sigma_x2 = np.ma.average((x-x_mean)**2, weights=w)
-    average = np.sqrt(sigma_x2)
-    return average
-
-def covar(x, ux, w):
-
-    """
-    Function to calculate covariance of x, ux variables.
-    **Parameters**
-    x, ux: two 1darrays of  phase-space coords
-    w: ndarray of particles' weights
-    **Returns**
-    covariance: float
-    """
-    x_mean = np.ma.average(x, weights=w)
-    ux_mean = np.ma.average(ux, weights=w)
-    covariance = np.ma.average((x-x_mean)*(ux-ux_mean), weights=w)
-    return covariance
-
-def emittance(x, ux, w):
-
-    """
-    Function to calculate emittance of a bunch.
-    **Parameters**
-    x, ux: two 1darrays of  phase-space coords
-    w: ndarray of particles' weights
-    **Returns**
-    emittance: float
-    """
-    sigma_x = central_average(x, w)
-    sigma_ux = central_average(ux, w)
-    covariance = covar(x, ux, w)
-
-    emit = np.sqrt(sigma_x**2*sigma_ux**2-covariance**2)
-
-    return emit
-
-def twiss(x, px, pz, w, type):
-
-    """
-    Function to calulate the Courant-Snyder parameters
-    of the bunch
-    **Parameters**
-    x: np.array
-        The space coords of particle.
-    px, pz: np.arrays
-        The transverse and longitudinal momenta of particles
-        to calculate the planar slice slope corresponding to 'x'
-    w: np.array
-        Weights of particles
-    type: str
-        'alpha', 'beta', or 'gamma' to select the desired twiss
-    **Returns**
-    tw: float
-        Twiss parameter specified
-    """
-    slope = divergence(px=px, pz=pz)
-    emit = emittance(x, slope, w)
-    inv_emit = 1/emit
-    if type == 'alpha':
-        covariance = covar(x, slope, w)
-        tw = covariance*(-inv_emit)
-    elif type == 'beta':
-        sigma_x = central_average(x, w)
-        tw = sigma_x**2*inv_emit
-    elif type == 'gamma':
-        sigma_slope = central_average(slope, w)
-        tw = sigma_slope**2*inv_emit
-
-    return tw
-
-def mean(x, w, energy=False):
-
-    mean = np.ma.average(x, weights=w)
-    if energy:
-        mean *= 0.511
-    return mean
-
-def energy_spread(gamma, w):
-
-    """
-    Function to calculate energy spread of bunch's energy spectra
-    **Parameters**
-        gamma: float, array
-            An array of normalized energy values
-        w: float, array
-            An array of weights
-    """
-    mean = np.ma.average(gamma, weights=w)
-    average = central_average(gamma, w)
-    sigma = average/mean
-    return sigma
+from fbpic_diag.utils import *
 
 class Diag(object):
 
@@ -1601,7 +1467,7 @@ class Diag(object):
         if output:
             return xedge, yedge, H
     
-    def  laser_waist_amplitude_evolution(self, it_window=None):
+    def  laser_waist_amplitude_evolution(self, it_window=None, method='exp'):
         """
         Method to calculate peak amplitude and waist (defined as the 
         peak_amplitude*e^-1 position) evolution during laser propagation
@@ -1624,6 +1490,14 @@ class Diag(object):
         w0=np.zeros(len(it))
         z=np.zeros(len(it))
         E0=self.__normalize__('E','x',None)
+
+        if method=='fit':
+            from scipy.optimize import curve_fit
+
+            def gauss_fit(x,y0,r_mean,r_std):
+                f = y0*np.exp(-(x-r_mean)**2/r_std**2)
+                return f
+
         for t in range(len(it)):
             E,info=self.ts.get_field('E',coord='x',iteration=it[t])
             env=np.abs(hilbert(E))
@@ -1631,9 +1505,19 @@ class Diag(object):
             i,j=np.unravel_index(np.argmax(a), shape=a.shape )
             field=a[:,j]
             a0=a[i,j]
-            Mask=np.ma.masked_where(field>=a0/np.e,field)
-            r=info.r[Mask.mask]
-            A[t]=a0
-            w0[t]=r.max()
+            A[t] = a0
+            if method=='exp':
+                Mask=np.ma.masked_where(field>=a0/np.e,field)
+                r = info.r[Mask.mask]
+                w0[t] = r.max()
+            elif method=='rms':
+                w0[t] = central_average(info.r,field)
+            elif method=='fit':
+                r_mean=mean(info.r,field)
+                r_std=central_average(info.r,field)
+                params,_ = curve_fit(gauss_fit,info.r,field,[a0,r_mean,r_std])
+                w0[t] = params[2]
+            else:
+                raise ValueError(f"Unrecognised method {method}; choose one among ('exp','rms','fit')")
             z[t]=info.z[j]
         return z, w0, A
