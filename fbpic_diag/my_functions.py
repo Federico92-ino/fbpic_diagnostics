@@ -1467,7 +1467,7 @@ class Diag(object):
         if output:
             return xedge, yedge, H
     
-    def  laser_waist_amplitude_evolution(self, it_window=None, method='exp'):
+    def  laser_waist_amplitude_evolution(self, it_window=None, method='exp',**curve_fit_kw):
         """
         Method to calculate peak amplitude and waist (defined as the 
         peak_amplitude*e^-1 position) evolution during laser propagation
@@ -1511,11 +1511,11 @@ class Diag(object):
                 r = info.r[Mask.mask]
                 w0[t] = r.max()
             elif method=='rms':
-                w0[t] = central_average(info.r,field)
+                w0[t] = np.sqrt(2)*central_average(info.r,field)
             elif method=='fit':
                 r_mean=mean(info.r,field)
                 r_std=central_average(info.r,field)
-                params,_ = curve_fit(gauss_fit,info.r,field,[a0,r_mean,r_std])
+                params,_ = curve_fit(gauss_fit,info.r,field,[a0,r_mean,r_std],**curve_fit_kw)
                 w0[t] = params[2]
             else:
                 raise ValueError(f"Unrecognised method {method}; choose one among ('exp','rms','fit')")
