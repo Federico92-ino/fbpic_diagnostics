@@ -1210,7 +1210,10 @@ class Diag(object):
         if species is None:
             species = self.avail_species[0]
 
-        ipp = 1/self.params['subsampling_fraction'][species]
+        if isinstance(self.params['subsampling_fraction'],dict):
+            ipp = 1/self.params['subsampling_fraction'][species]
+        else:
+            ipp = 1/self.params['subsampling_fraction']
         bins = 300
 
         if 'density' in kwargs:
