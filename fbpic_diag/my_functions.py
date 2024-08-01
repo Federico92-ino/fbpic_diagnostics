@@ -941,7 +941,11 @@ class Diag(object):
         """
         if species is None:
             species = self.avail_species[0]
-        inv_ptcl_percent = 1/self.params['subsampling_fraction'][species]
+
+        if isinstance(self.params['subsampling_fraction'],dict):
+            inv_ptcl_percent = 1/self.params['subsampling_fraction'][species]
+        else:
+            inv_ptcl_percent = 1/self.params['subsampling_fraction']
         if not t_lim:
             t_lim = [self.t.min(), self.t.max()]
         inds = np.where((self.t >= t_lim[0]) & (self.t <= t_lim[1]))
@@ -1336,7 +1340,11 @@ class Diag(object):
         """
         if species is None:
             species = self.avail_species[0]
-        inv_ptcl_percent = 1/self.params['subsampling_fraction'][species]
+
+        if isinstance(self.params['subsampling_fraction'],dict):     
+            inv_ptcl_percent = 1/self.params['subsampling_fraction'][species]
+        else:
+            inv_ptcl_percent = 1/self.params['subsampling_fraction']
 
         cmap = 'Reds'
         bins = 1000
@@ -1469,8 +1477,11 @@ class Diag(object):
     
     def  laser_waist_amplitude_evolution(self, it_window=None, method='exp',**curve_fit_kw):
         """
-        Method to calculate peak amplitude and waist (defined as the 
-        peak_amplitude*e^-1 position) evolution during laser propagation
+        Method to calculate peak amplitude and waist evolution during laser propagation.
+        For waist calculation three methods are available:
+        - "fit": standard deviation of the gauss-fit of the max laser intensity slice;
+        - "exp": the radial coordinate of the max_a/np.e point;
+        - "rms": the field-weighted radial coordinates average.
 
         **Parameters**
 
