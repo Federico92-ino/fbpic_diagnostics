@@ -95,27 +95,27 @@ class Diag(object):
                 Same parameters of .get_field() method.
                 Same defaults (0, 'all')
         """
-
+        beta = input("To calculate the Lorentz force, enter the proper normalized speed of particles:")
         if coord == 'x':
             E, info_e = self.ts.get_field('E', 'x', iteration=iteration, m=m, theta=theta)
             B, info_b = self.ts.get_field('B', 'y', iteration=iteration, m=m, theta=theta)
             del info_b
-            F = e*(E - c*B)
+            F = e*(E - beta*c*B)
         elif coord == 'y':
             E, info_e = self.ts.get_field('E', 'y', iteration=iteration, m=m, theta=theta)
             B, info_b = self.ts.get_field('B', 'x', iteration=iteration, m=m, theta=theta)
             del info_b
-            F = e*(E + c*B)
+            F = e*(E + beta*c*B)
         elif coord == 'r':
             E, info_e = self.ts.get_field('E', 'r', iteration=iteration, m=m, theta=theta)
             B, info_b = self.ts.get_field('B', 't', iteration=iteration, m=m, theta=theta)
             del info_b
-            F = e*(E - c*B)
+            F = e*(E - beta*c*B)
         elif coord == 't':
             E, info_e = self.ts.get_field('E', 't', iteration=iteration, m=m, theta=theta)
             B, info_b = self.ts.get_field('B', 'r', iteration=iteration, m=m, theta=theta)
             del info_b
-            F = e*(E + c*B)
+            F = e*(E + beta*c*B)
         else:
             raise ValueError("You must specify a force component in \n"
                              "\t\a 'x', 'y', 'r' or 't' direction for 'coord'")
