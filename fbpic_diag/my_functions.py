@@ -664,6 +664,7 @@ class Diag(object):
         elif field_name == 'force':
             if 'speed' in kwargs:
                 speed = kwargs['speed']
+                del kwargs['speed']
             else:
                 speed = None
             E, info_e = self.__force__(coord, iteration, speed, theta, m)
@@ -749,6 +750,7 @@ class Diag(object):
         elif field_name == 'force':
             if 'speed' in kwargs:
                 speed = kwargs['speed']
+                del kwargs['speed']
             else:
                 speed = None
             E, info_e = self.__force__(coord, iteration, speed, theta, m)
@@ -852,6 +854,7 @@ class Diag(object):
             elif field_name == 'force':
                 if 'speed' in kwargs:
                     speed = kwargs['speed']
+                    del kwargs['speed']
                 else:
                     speed = None 
                 E = self.__force__(coord, iteration, speed, theta=T, m=m)[0]
