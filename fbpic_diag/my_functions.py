@@ -82,7 +82,7 @@ class Diag(object):
             phi[:, i] = np.trapz(Ez[:, i:i+2], dx=info_e.dz) + phi[:, i+1]
         return phi, info_e
 
-    def __force__(self, coord, iteration, theta=0, m='all'):
+    def __force__(self, coord, iteration, speed, theta=0, m='all'):
         """
         Method to calculate transverse components of force .
 
@@ -95,7 +95,10 @@ class Diag(object):
                 Same parameters of .get_field() method.
                 Same defaults (0, 'all')
         """
-        beta = float(input("To calculate the Lorentz force, enter the proper normalized speed of particles:"))
+        if not speed:
+            beta = float(input("To calculate the Lorentz force, enter the proper normalized speed of particles:"))
+        else:
+            beta = speed
         if coord == 'x':
             E, info_e = self.ts.get_field('E', 'x', iteration=iteration, m=m, theta=theta)
             B, info_b = self.ts.get_field('B', 'y', iteration=iteration, m=m, theta=theta)
@@ -659,7 +662,11 @@ class Diag(object):
         if field_name == 'phi':
             E, info_e = self.__potential__(iteration, theta=theta, m=m)
         elif field_name == 'force':
-            E, info_e = self.__force__(coord, iteration, theta, m)
+            if 'speed' in kwargs:
+                speed = kwargs['speed']
+            else:
+                speed = None
+            E, info_e = self.__force__(coord, iteration, speed, theta, m)
         elif field_name == 'envelope':
             E, info_e = self.__envelope__(iteration,m)
         else:
@@ -740,7 +747,11 @@ class Diag(object):
         if field_name == 'phi':
             E, info_e = self.__potential__(iteration, theta=theta, m=m)
         elif field_name == 'force':
-            E, info_e = self.__force__(coord, iteration, theta, m)
+            if 'speed' in kwargs:
+                speed = kwargs['speed']
+            else:
+                speed = None
+            E, info_e = self.__force__(coord, iteration, speed, theta, m)
         elif field_name == 'envelope':
             E, info_e = self.__envelope__(iteration,m)
         else:
@@ -839,7 +850,11 @@ class Diag(object):
                 E = self.__potential__(iteration, theta=T, m=m)[0]
                 field[:,i] = E[Nr:,nz].copy()
             elif field_name == 'force':
-                E = self.__force__(coord, iteration, theta=T, m=m)[0]
+                if 'speed' in kwargs:
+                    speed = kwargs['speed']
+                else:
+                    speed = None 
+                E = self.__force__(coord, iteration, speed, theta=T, m=m)[0]
                 field[:,i] = E[Nr:,nz].copy()
             elif field_name == 'envelope':
                 E = self.__envelope__(iteration,m)[0]
