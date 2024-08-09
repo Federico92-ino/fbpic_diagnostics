@@ -1527,20 +1527,18 @@ class Diag(object):
             raise ValueError(str(property) + " is not an available property.\n"
                              "Available properties are:\n -{:s}\nTry again".format(prop))
         else:
-            if property == 'charge':
-                Q = dict()
-                l,m = [np.empty(0) for _ in range(2)]
-                for species in species_list:
-                    Q[species] = self.ts.get_particle(['charge'], t=self.t[-1], species=species)[0]
-            elif property in ['beam_size','momenta_spread','mean_energy','en_spread']:
-                l,m,n = [np.empty(0) for _ in range(3)]
-            elif property in ['ph_emit_n', 'divergence']:
-                l,m,n,o = [np.empty(0) for _ in range(4)]
-            elif property in ['solid_div','tr_emit','tw_alpha','tw_beta','tw_gamma']:
-                l,m,n,o,p = [np.empty(0) for _ in range(5)]
+            Q = dict()
             species_select = np.stack((species_list,select_list),axis=1)
-
+            for species in species_list:
+                Q[species] = self.ts.get_particle(['charge'], t=self.t[-1], species=species)[0]
             for k, i in enumerate(t):
+                if property in ['beam_size','momenta_spread','mean_energy','en_spread']:
+                    l,m,n = [np.empty(0) for _ in range(3)]
+                elif property in ['ph_emit_n', 'divergence']:
+                    l,m,n,o = [np.empty(0) for _ in range(4)]
+                elif property in ['solid_div','tr_emit','tw_alpha','tw_beta','tw_gamma']:
+                    l,m,n,o,p = [np.empty(0) for _ in range(5)]
+           
                 if property == 'ph_emit_n':
                     for species,select in species_select:
                         if select is not None and 'div' in select:
@@ -1610,6 +1608,7 @@ class Diag(object):
                     Z[k] = mean(o,p)
                     continue
                 elif property == 'charge':
+                    l,m = [np.empty(0) for _ in range(2)]
                     for species, select in species_select:
                         if select is not None and 'div' in select:
                             z, w = self.__select_by_div__(['z','w'], t=i, select=select, species=species)
