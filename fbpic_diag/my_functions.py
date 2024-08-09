@@ -1621,7 +1621,7 @@ class Diag(object):
                             ipp = 1/self.params['subsampling_fraction']
                         l = np.append(l,z)
                         m = np.append(m,Q[species]*w*ipp)
-                    a[k] = m.nansum()
+                    a[k] = np.nansum(m)
                     Z[k] = mean(l,np.abs(m))
                     continue
                 elif property == 'mean_energy':
