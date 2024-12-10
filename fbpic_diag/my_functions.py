@@ -725,7 +725,7 @@ class Diag(object):
 
     def map(self, field_name, iteration,
             coord=None, theta=0, m='all', normalize=False, A0=None, 
-            z0=0., norms=[1.,1.], output=False, **kwargs):
+            z0=0., norms=[1.,1.], output=False, mask=None, **kwargs):
         """
         Method to get a 2D-map of passed field_name
 
@@ -799,10 +799,13 @@ class Diag(object):
             extent[0:2]+=z0
         extent[0:2]*=norms[0]
         extent[2:4]*=norms[1]
-        plt.imshow(E/E0, extent=extent,
+        if mask is not None:
+            E = np.ma.masked_where(E<=mask*E0,E)
+        E /= E0
+        plt.imshow(E, extent=extent,
                   origin=origin, **kwargs)
         if output:
-            return E/E0, extent
+            return E, extent
 
     def transverse_map(self, field_name, iteration, coord=None,
             m='all', normalize=False, A0=None,
