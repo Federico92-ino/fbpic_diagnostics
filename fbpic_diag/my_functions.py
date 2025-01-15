@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from openpmd_viewer import OpenPMDTimeSeries, ParticleTracker
 import json
-from scipy.constants import e, m_e, c, pi
+from scipy.constants import e, m_e, c, pi,epsilon_0
 from scipy.signal import hilbert
 from fbpic_diag.utils import *
 
@@ -168,6 +168,59 @@ class Diag(object):
                 else:
                     comp_list[i] = comp_list[i][mask]
         return comp_list
+    
+    def __laser_param_calc__(self,param,it, method,**curve_fit_kw):
+        P = np.empty_like(it,dtype=float)
+        if param=='peak_amplitude' or param=='waist':
+            E0 = self.__normalize__('E','x',None)
+            if method=="fit":
+                from scipy.optimize import curve_fit
+
+                def gauss_fit(x,y0,r_mean,r_std):
+                    f = y0*np.exp(-(x-r_mean)**2/r_std**2)
+                    return f
+            for k,t in enumerate(it):
+                E,info=self.ts.get_field('E',coord='x',iteration=t)
+                a=np.abs(hilbert(E))/E0
+                i,j=np.unravel_index(np.argmax(a), shape=a.shape )
+                field=a[:,j]
+                a0=a[i,j]
+                if param == "peak_amplitude":
+                    P[k] = a0
+                elif param == "waist":
+                    if method=='exp':
+                        Mask=np.ma.masked_where(field>=a0/np.e,field)
+                        r = info.r[Mask.mask]
+                        P[k] = r.max()
+                    elif method=='rms':
+                        P[k] = np.sqrt(2)*central_average(info.r,field)
+                    elif method=='fit':
+                        r_mean=mean(info.r,field)
+                        r_std=central_average(info.r,field)
+                        params,_ = curve_fit(gauss_fit,info.r,field,[a0,r_mean,r_std],**curve_fit_kw)
+                        P[k] = params[2]
+                    else:
+                        raise ValueError(f"Unrecognised method {method}; choose one among ('exp','rms','fit')")                
+        elif param=="energy":
+            vec_E = np.empty(3,dtype=np.ndarray)
+            vec_B = np.empty(3,dtype=np.ndarray)
+            for k,t in enumerate(it):
+                mod2E = np.empty(1,dtype=np.ndarray)
+                mod2B = np.empty(1,dtype=np.ndarray)
+                for i,coord in enumerate(['x','y','z']):
+                    F0_tmp,info = self.ts.get_field('E',coord=coord,iteration=t,theta=0)
+                    F90_tmp,info = self.ts.get_field('E',coord=coord,iteration=t,theta=pi/2)
+                    vec_E[i] = (F0_tmp+F90_tmp)/2
+                    F0_tmp,info = self.ts.get_field('B',coord=coord,iteration=t,theta=0)
+                    F90_tmp,info= self.ts.get_field('B',coord=coord,iteration=t,theta=pi/2)
+                    vec_B[i] = (F0_tmp+F90_tmp)/2
+                    mod2E += vec_E[i]*vec_E[i]
+                    mod2B += vec_B[i]*vec_B[i]
+                Nx = F0_tmp.shape[0]
+                Nr = int(.5*(Nx+1))
+                u = epsilon_0/2*(mod2E+c**2*mod2B)
+                P[k] = 2*pi*np.trapz(np.trapz(u[Nr:,:],dx=info.dz,axis=1)*info.r[Nr:],dx=info.dr)
+        return P
 
     def slice_emit(self, N, select=None, species=None, iteration=None,
                     plot=False, components=['x','ux'], mask=0., trans_space='x',
@@ -1468,15 +1521,20 @@ class Diag(object):
         if output:
             return xedge, yedge, H
     
-    def  laser_waist_amplitude_evolution(self, it_window=None, method='exp',**curve_fit_kw):
+    def  laser_params_evolution(self,params:str|list|tuple, it_window=None, method='exp',**curve_fit_kw):
         """
-        Method to calculate peak amplitude and waist evolution during laser propagation.
+        Method to calculate peak amplitude, waist and EM energy evolution during laser propagation.
         For waist calculation three methods are available:
         - "fit": standard deviation of the gauss-fit of the max laser intensity slice;
         - "exp": the radial coordinate of the max_a/np.e point;
         - "rms": the field-weighted radial coordinates average.
 
         **Parameters**
+        params: str or list/tuple of str
+            Choose the parameters to calculate. You can choose among:
+                -"peak_amplitude"
+                -"waist"
+                -"energy"
 
         it_window: tuple or list of two ints
             Selects the temporal window wanted for calculations
@@ -1490,41 +1548,12 @@ class Diag(object):
             it = self.iterations
         else:
             it = self.iterations[it_window[0]:it_window[1]]
-        A=np.zeros(len(it))
-        w0=np.zeros(len(it))
-        z=np.zeros(len(it))
-        E0=self.__normalize__('E','x',None)
+        if isinstance(params,str):
+            P = self.__laser_param_calc__(params,it,method,**curve_fit_kw)
+        elif isinstance(params,(list,tuple)):
+            P = [self.__laser_param_calc__(param,it,method,**curve_fit_kw) for param in params]
 
-        if method=='fit':
-            from scipy.optimize import curve_fit
-
-            def gauss_fit(x,y0,r_mean,r_std):
-                f = y0*np.exp(-(x-r_mean)**2/r_std**2)
-                return f
-
-        for t in range(len(it)):
-            E,info=self.ts.get_field('E',coord='x',iteration=it[t])
-            env=np.abs(hilbert(E))
-            a=env/E0
-            i,j=np.unravel_index(np.argmax(a), shape=a.shape )
-            field=a[:,j]
-            a0=a[i,j]
-            A[t] = a0
-            if method=='exp':
-                Mask=np.ma.masked_where(field>=a0/np.e,field)
-                r = info.r[Mask.mask]
-                w0[t] = r.max()
-            elif method=='rms':
-                w0[t] = np.sqrt(2)*central_average(info.r,field)
-            elif method=='fit':
-                r_mean=mean(info.r,field)
-                r_std=central_average(info.r,field)
-                params,_ = curve_fit(gauss_fit,info.r,field,[a0,r_mean,r_std],**curve_fit_kw)
-                w0[t] = params[2]
-            else:
-                raise ValueError(f"Unrecognised method {method}; choose one among ('exp','rms','fit')")
-            z[t]=info.z[j]
-        return z, w0, A
+        return P
 
     def joined_species_beam_properties(self, property, species_list,
                                        select_list, trans_space='x',
