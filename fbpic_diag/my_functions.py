@@ -205,8 +205,6 @@ class Diag(object):
             vec_E = np.empty(3,dtype=np.ndarray)
             vec_B = np.empty(3,dtype=np.ndarray)
             for k,t in enumerate(it):
-                mod2E = np.empty(1,dtype=np.ndarray)
-                mod2B = np.empty(1,dtype=np.ndarray)
                 for i,coord in enumerate(['x','y','z']):
                     F0_tmp,info = self.ts.get_field('E',coord=coord,iteration=t,theta=0)
                     F90_tmp,info = self.ts.get_field('E',coord=coord,iteration=t,theta=pi/2)
@@ -214,8 +212,8 @@ class Diag(object):
                     F0_tmp,info = self.ts.get_field('B',coord=coord,iteration=t,theta=0)
                     F90_tmp,info= self.ts.get_field('B',coord=coord,iteration=t,theta=pi/2)
                     vec_B[i] = (F0_tmp+F90_tmp)/2
-                    mod2E += vec_E[i]*vec_E[i]
-                    mod2B += vec_B[i]*vec_B[i]
+                mod2E = vec_E[0]**2+vec_E[1]**2+vec_E[2]**2
+                mod2B = vec_B[0]**2+vec_B[1]**2+vec_B[2]**2
                 Nx = F0_tmp.shape[0]
                 Nr = int(.5*(Nx+1))
                 u = epsilon_0/2*(mod2E+c**2*mod2B)
