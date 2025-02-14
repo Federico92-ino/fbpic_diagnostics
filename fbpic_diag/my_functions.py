@@ -1161,7 +1161,7 @@ class Diag(object):
                         x, ux, uz, z, w = self.__select_by_div__([A,B,'uz','z','w'], t=i, select=select, species=species)
                     else:                            
                         x, ux, uz, z, w = self.ts.get_particle([A,B,'uz','z','w'], t=i, select=select, species=species)
-                    a[k] = twiss(x, ux, uz, w, property.remove('tw_',''))
+                    a[k] = twiss(x, ux, uz, w, property.replace('tw_',''))
                     Z[k] = mean(z,w)
             if output:
                 return Z, a
@@ -1807,7 +1807,7 @@ class Diag(object):
                         n = np.append(n,uz)
                         o = np.append(o,z)
                         p = np.append(p,w)
-                    a[k] = twiss(l, m, n, p, property.remove('tw_',''))
+                    a[k] = twiss(l, m, n, p, property.replace('tw_',''))
                     Z[k] = mean(o,p)
             if output:
                 return Z, a
