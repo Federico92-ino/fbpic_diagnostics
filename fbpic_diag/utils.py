@@ -1,5 +1,5 @@
 import numpy as np 
-
+import sys
 def divergence(px=None, py=None, pz=None):
 
     """
@@ -113,14 +113,11 @@ def twiss(x, px, pz, w, type):
 
     return tw
 
-def mean(x, w, energy=False):
-
+def mean(x, w):
     mean = np.ma.average(x, weights=w)
-    if energy:
-        mean *= 0.511
     return mean
 
-def energy_spread(gamma, w):
+def energy_spread(gamma, w, kind='rms'):
 
     """
     Function to calculate energy spread of bunch's energy spectra
@@ -130,7 +127,47 @@ def energy_spread(gamma, w):
         w: float, array
             An array of weights
     """
-    mean = np.ma.average(gamma, weights=w)
-    average = central_average(gamma, w)
-    sigma = average/mean
+    match kind:
+        case 'rms':
+            mean = mean(gamma, w)
+            dev = central_average(gamma, w)
+        case 'mad':
+            mean = weighted_median(gamma, w)
+            dev = median_absolute_deviation(gamma, w)*1.4826
+    sigma = dev/mean
     return sigma
+
+def weighted_median(x,w=None):
+
+    """
+    Inspired from "weightedstats" by Jack Peterson: minor changes
+    using numpy functions to speed up
+    **Parameters**
+        x: iterable
+            Array of values from which build a distribution and 
+            calculate median
+        w: iterable or None
+            Array of weights; if None return standard median
+    """
+    if all((isinstance(tmp,np.ndarray) for tmp in (x,w))):
+        pass
+    else:
+        x,w = map(np.array,(x,w))
+    if w is None:
+        return np.ma.median(x)
+    if any(w > 0):
+        sorted_w = w[np.ma.argsort(x)]
+        sorted_x = np.ma.sort(x)
+        midpoint = 0.5 * np.ma.sum(sorted_w)
+        if any(w > midpoint):
+            return (x[np.ma.argmax(w)])[0]
+        cumulative_weight = np.ma.cumsum(sorted_w)
+        below_midpoint_index = np.ma.where(cumulative_weight <= midpoint)[0][-1]
+        if np.ma.abs(cumulative_weight[below_midpoint_index] - midpoint) < sys.float_info.epsilon:
+            return np.ma.mean(sorted_x[below_midpoint_index:below_midpoint_index+2])
+        return sorted_x[below_midpoint_index+1]
+    
+def median_absolute_deviation(x, w):
+    median = weighted_median(x, w)
+    mad = weighted_median(np.ma.abs(x-median),w)
+    return mad

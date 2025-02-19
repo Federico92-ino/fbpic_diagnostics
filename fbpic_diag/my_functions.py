@@ -471,7 +471,7 @@ class Diag(object):
                 plt.pcolormesh(X*norms[0], Y*norms[1], H, cmap=cmap[n+1], alpha=alpha,**kwargs)
         return S_prop, dz
 
-    def slice_analysis(self, dz, n_slice, prop, trans_space='x', species=None, select=None, norm_z=1.): #to be reviewed  
+    def slice_analysis(self, dz, n_slice, prop, trans_space='x', species=None, select=None, norm_z=1.,energy_calc_type='rms'): #to be reviewed  
         """
         Function to calculate 'prop' evolution of 'n_slice' slices of width 'dz'
 
@@ -522,6 +522,10 @@ class Diag(object):
 
         norm_z: float
             Constant to multiply z-axis for normalization; set in meters
+
+        energy_calc_type: str
+            How to calculate mean energy and/or energy spread. Choose between
+            'rms' or 'mad'. Default 'rms'    
 
         **Returns**
             Z: ndarray
@@ -616,7 +620,11 @@ class Diag(object):
                         gamma = self.ts.get_particle(['gamma'], species=species, select=selection, iteration=t)[0]
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
-                    a[j,i] = mean(gamma, W, energy=True)
+                    match energy_calc_type:
+                        case 'rms':
+                            a[j,i] = mean(gamma, W)*m_e*c**2
+                        case 'mad':
+                            a[j,i] = weighted_median(gamma, W)*m_e*c**2
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'en_spread':
@@ -626,7 +634,7 @@ class Diag(object):
                         gamma = self.ts.get_particle(['gamma'], species=species, select=selection, iteration=t)[0]
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
-                    a[j,i] = energy_spread(gamma,W)
+                    a[j,i] = energy_spread(gamma,W,energy_calc_type)
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'charge':
@@ -965,7 +973,7 @@ class Diag(object):
 
     def bunch_properties_evolution(self, select, property, species=None, trans_space='x',
                                     t_lim=False, output=True, plot=False,
-                                    norm_z=1, Norm=1., **kwargs):
+                                    norm_z=1, Norm=1., energy_calc_type='rms', **kwargs):
         """
         Method to select a bunch and to plot the evolution of
         its characteristics along propagation length
@@ -1024,6 +1032,10 @@ class Diag(object):
 
         Norm: float
             Multiplying constant to set properties normalization.
+
+        energy_calc_type: str
+            How to calculate mean energy and/or energy spread. Choose between
+            'rms' or 'mad'. Default 'rms'    
 
         **kwargs: keyword to pass to .pyplot.plot()
 
@@ -1130,7 +1142,11 @@ class Diag(object):
                         gamma, z, w = self.__select_by_div__(['gamma','z','w'], t=i, select=select, species=species)
                     else:                                
                         gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
-                    a[k] = mean(gamma,w,energy=True)
+                    match energy_calc_type:
+                        case 'rms':
+                            a[k] = mean(gamma,w)*m_e*c**2
+                        case 'mad':
+                            a[k] = weighted_median(gamma,w)*m_e*c**2
                     Z[k] = mean(z,w)
                     continue
                 elif property == 'en_spread':
@@ -1140,7 +1156,7 @@ class Diag(object):
                         gamma, z, w = self.__select_by_div__(['gamma','z','w'], t=i, select=select, species=species)
                     else:                            
                         gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
-                    a[k] = energy_spread(gamma, w)
+                    a[k] = energy_spread(gamma, w, energy_calc_type)
                     Z[k] = mean(z,w)
                     continue
                 elif property == 'tr_emit':
@@ -1250,8 +1266,11 @@ class Diag(object):
                                                           iteration=iteration, species=species, select=select)
             vz = c*uz/gamma
             pre_values, Bin = np.histogram(z, bins=bins, weights=q*vz*w*ipp)
-            inv_dz = bins/(z.max()-z.min())
-            values = np.abs(pre_values*inv_dz)
+            try:
+                inv_dz = bins/(z.max()-z.min())
+                values = np.abs(pre_values*inv_dz)
+            except ValueError("There are no particles; current set to 'NaN'"):
+                values = np.nan
             inv_norm_z = 1.
         elif 'div' in component:
             if '2' in component:
@@ -1556,7 +1575,7 @@ class Diag(object):
     def joined_species_beam_properties(self, property, species_list,
                                        select_list, trans_space='x',
                                        t_lim=False, output=True, plot=False,
-                                       norm_z=1, Norm=1., **kwargs):
+                                       norm_z=1, Norm=1., energy_calc_type='rms', **kwargs):
         """
         Method to select particles from several species and calculate properties
         of the resulting bunch as a whole
@@ -1617,6 +1636,10 @@ class Diag(object):
 
         Norm: float
             Multiplying constant to set properties normalization.
+
+        energy_calc_type: str
+            How to calculate mean energy and/or energy spread. Choose between
+            'rms' or 'mad'. Default 'rms'    
 
         **kwargs: keyword to pass to .pyplot.plot()
 
@@ -1760,7 +1783,11 @@ class Diag(object):
                         l = np.append(l,gamma)
                         m = np.append(m,z)
                         n = np.append(n,w)
-                    a[k] = mean(l,n,energy=True)
+                    match energy_calc_type:
+                        case 'rms':
+                            a[k] = mean(l,n)*m_e*c**2
+                        case 'mad':
+                            a[k] = weighted_median(l,n)*m_e*c**2
                     Z[k] = mean(m,n)
                     continue
                 elif property == 'en_spread':
@@ -1774,7 +1801,7 @@ class Diag(object):
                         l = np.append(l,gamma)
                         m = np.append(m,z)
                         n = np.append(n,w)
-                    a[k] = energy_spread(l, n)
+                    a[k] = energy_spread(l, n, energy_calc_type)
                     Z[k] = mean(m,n)
                     continue
                 elif property == 'tr_emit':
