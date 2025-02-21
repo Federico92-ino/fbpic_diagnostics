@@ -622,9 +622,9 @@ class Diag(object):
                     W = w[inds]
                     match energy_calc_type:
                         case 'rms':
-                            a[j,i] = mean(gamma, W)*m_e*c**2
+                            a[j,i] = mean(gamma, W)*(m_e*c**2/e)*1e-6
                         case 'mad':
-                            a[j,i] = weighted_median(gamma, W)*m_e*c**2
+                            a[j,i] = weighted_median(gamma, W)*(m_e*c**2)/e*1e-6
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'en_spread':
@@ -1144,9 +1144,9 @@ class Diag(object):
                         gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
                     match energy_calc_type:
                         case 'rms':
-                            a[k] = mean(gamma,w)*m_e*c**2
+                            a[k] = mean(gamma,w)*(m_e*c**2/e)*1e-6
                         case 'mad':
-                            a[k] = weighted_median(gamma,w)*m_e*c**2
+                            a[k] = weighted_median(gamma,w)*(m_e*c**2/e)*1e-6
                     Z[k] = mean(z,w)
                     continue
                 elif property == 'en_spread':
@@ -1785,9 +1785,9 @@ class Diag(object):
                         n = np.append(n,w)
                     match energy_calc_type:
                         case 'rms':
-                            a[k] = mean(l,n)*m_e*c**2
+                            a[k] = mean(l,n)*(m_e*c**2/e)*1e-6
                         case 'mad':
-                            a[k] = weighted_median(l,n)*m_e*c**2
+                            a[k] = weighted_median(l,n)*(m_e*c**2/e)*11e-6
                     Z[k] = mean(m,n)
                     continue
                 elif property == 'en_spread':
