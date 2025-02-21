@@ -114,8 +114,8 @@ def twiss(x, px, pz, w, type):
     return tw
 
 def mean(x, w):
-    mean = np.ma.average(x, weights=w)
-    return mean
+    m = np.ma.average(x, weights=w)
+    return m
 
 def energy_spread(gamma, w, kind='rms'):
 
@@ -129,12 +129,12 @@ def energy_spread(gamma, w, kind='rms'):
     """
     match kind:
         case 'rms':
-            mean = mean(gamma, w)
+            Mean = mean(gamma,w)
             dev = central_average(gamma, w)
         case 'mad':
-            mean = weighted_median(gamma, w)
+            Mean = weighted_median(gamma, w)
             dev = median_absolute_deviation(gamma, w)*1.4826
-    sigma = dev/mean
+    sigma = dev/Mean
     return sigma
 
 def weighted_median(x,w=None):
