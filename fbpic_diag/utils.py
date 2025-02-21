@@ -117,7 +117,7 @@ def mean(x, w):
     m = np.ma.average(x, weights=w)
     return m
 
-def energy_spread(gamma, w, kind='rms'):
+def energy_spread(gamma, w, kind):
 
     """
     Function to calculate energy spread of bunch's energy spectra
