@@ -1268,9 +1268,11 @@ class Diag(object):
             pre_values, Bin = np.histogram(z, bins=bins, weights=q*vz*w*ipp)
             try:
                 inv_dz = bins/(z.max()-z.min())
-                values = np.abs(pre_values*inv_dz)
-            except ValueError("There are no particles; current set to 'NaN'"):
+            except:
+                print("There are no particles; current set to 'NaN'")
                 values = np.nan
+            else:
+                values = np.abs(pre_values*inv_dz)
             inv_norm_z = 1.
         elif 'div' in component:
             if '2' in component:
