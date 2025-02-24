@@ -1267,6 +1267,7 @@ class Diag(object):
             vz = c*uz/gamma
             try:
                 pre_values, Bin = np.histogram(z, bins=bins, weights=q*vz*w*ipp)
+                inv_dz = bins/(z.max()-z.min())
             except:
                 print("There are no particles; current set to 'NaN'")
                 Bin = np.full(bins+1,np.nan)
