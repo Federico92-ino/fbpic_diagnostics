@@ -1265,13 +1265,15 @@ class Diag(object):
                 z, uz, gamma, q, w = self.ts.get_particle(['z','uz','gamma','charge','w'],
                                                           iteration=iteration, species=species, select=select)
             vz = c*uz/gamma
-            pre_values, Bin = np.histogram(z, bins=bins, weights=q*vz*w*ipp)
             try:
-                inv_dz = bins/(z.max()-z.min())
+                pre_values, Bin = np.histogram(z, bins=bins, weights=q*vz*w*ipp)
             except:
                 print("There are no particles; current set to 'NaN'")
-                values = np.nan
+                Bin = np.full(bins+1,np.nan)
+                values = np.full(bins,np.nan)
             else:
+                pre_values, Bin = np.histogram(z, bins=bins, weights=q*vz*w*ipp)
+                inv_dz = bins/(z.max()-z.min())
                 values = np.abs(pre_values*inv_dz)
             inv_norm_z = 1.
         elif 'div' in component:
