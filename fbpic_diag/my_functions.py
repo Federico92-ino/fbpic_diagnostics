@@ -117,12 +117,27 @@ class Diag(object):
                              "\t\a 'x', 'y', 'r' or 't' direction for 'coord'")
         return F, info_e
 
-    def __envelope__(self, iteration, m='all'):
+    def __envelope__(self, iteration, m, env_kw):
         Ex, info_e = self.ts.get_field('E','x',iteration=iteration,m=m)
         Ey, info = self.ts.get_field('E','y',iteration=iteration,m=m)
-        EX = np.abs(hilbert(Ex))
-        EY = np.abs(hilbert(Ey))
-        E = np.sqrt(EX**2+EY**2)
+        if env_kw:
+            if 'mode' in env_kw:
+                mode = env_kw['mode']
+                del env_kw['mode']
+            EX = np.abs(hilbert(Ex,**env_kw))
+            EY = np.abs(hilbert(Ey,**env_kw))
+        else:
+            mode = "both"
+            EX = np.abs(hilbert(Ex))
+            EY = np.abs(hilbert(Ey))
+
+        match mode:
+            case 'x':
+                E = EX
+            case 'y': 
+                E = EY
+            case "both":
+                E = np.sqrt(EX**2+EY**2)
         del info
         return E, info_e
 
@@ -694,7 +709,7 @@ class Diag(object):
     def lineout(self, field_name, iteration,
                 coord=None, theta=0, m='all',
                 normalize=False, A0=None, slicing='z',
-                on_axis=None, z0=0., norm_z=1., output=False, **kwargs):
+                on_axis=None, z0=0., norm_z=1., output=False, env_kw=None,**kwargs):
         """
         Method to get a lineout plot of passed field_name
 
@@ -753,8 +768,8 @@ class Diag(object):
             else:
                 speed = None
             E, info_e = self.__force__(coord, iteration, speed, theta, m)
-        elif field_name == 'envelope':
-            E, info_e = self.__envelope__(iteration,m)
+        elif field_name == 'envelope': 
+            E, info_e = self.__envelope__(iteration,m,env_kw)
         else:
             E, info_e = self.ts.get_field(field=field_name, coord=coord,
                                           iteration=iteration, theta=theta, m=m)
@@ -784,7 +799,7 @@ class Diag(object):
 
     def map(self, field_name, iteration,
             coord=None, theta=0, m='all', normalize=False, A0=None, 
-            z0=0., norms=[1.,1.], output=False, mask=None, **kwargs):
+            z0=0., norms=[1.,1.], output=False, mask=None,env_kw=None, **kwargs):
         """
         Method to get a 2D-map of passed field_name
 
@@ -840,7 +855,7 @@ class Diag(object):
                 speed = None
             E, info_e = self.__force__(coord, iteration, speed, theta, m)
         elif field_name == 'envelope':
-            E, info_e = self.__envelope__(iteration,m)
+            E, info_e = self.__envelope__(iteration,m,env_kw)
         else:
             E, info_e = self.ts.get_field(field=field_name, coord=coord,
                                           iteration=iteration, theta=theta, m=m)
@@ -868,7 +883,7 @@ class Diag(object):
 
     def transverse_map(self, field_name, iteration, coord=None,
             m='all', normalize=False, A0=None,
-            z_pos=None, swap_axis=False, norms=[1.,1.], **kwargs):
+            z_pos=None, swap_axis=False, norms=[1.,1.], env_kw=None, **kwargs):
         """
         Method to get a 2D-transverse map of passed field_name
         in x-y  or y-x plane
@@ -948,7 +963,7 @@ class Diag(object):
                 E = self.__force__(coord, iteration, speed, theta=T, m=m)[0]
                 field[:,i] = E[Nr:,nz].copy()
             elif field_name == 'envelope':
-                E = self.__envelope__(iteration,m)[0]
+                E = self.__envelope__(iteration,m,env_kw)[0]
                 field[:,i] = E[Nr:,nz].copy()
             else:
                 E = self.ts.get_field(field=field_name, coord=coord,
