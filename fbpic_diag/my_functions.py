@@ -117,9 +117,9 @@ class Diag(object):
                              "\t\a 'x', 'y', 'r' or 't' direction for 'coord'")
         return F, info_e
 
-    def __envelope__(self, iteration, m, env_kw):
-        Ex, info_e = self.ts.get_field('E','x',iteration=iteration,m=m)
-        Ey, info = self.ts.get_field('E','y',iteration=iteration,m=m)
+    def __envelope__(self, iteration, m, theta, env_kw):
+        Ex, info_e = self.ts.get_field('E','x',iteration=iteration,m=m,theta=theta)
+        Ey, info = self.ts.get_field('E','y',iteration=iteration,m=m,theta=theta)
         if env_kw:
             if 'mode' in env_kw:
                 mode = env_kw['mode']
@@ -769,7 +769,7 @@ class Diag(object):
                 speed = None
             E, info_e = self.__force__(coord, iteration, speed, theta, m)
         elif field_name == 'envelope': 
-            E, info_e = self.__envelope__(iteration,m,env_kw)
+            E, info_e = self.__envelope__(iteration,m,theta,env_kw)
         else:
             E, info_e = self.ts.get_field(field=field_name, coord=coord,
                                           iteration=iteration, theta=theta, m=m)
@@ -855,7 +855,7 @@ class Diag(object):
                 speed = None
             E, info_e = self.__force__(coord, iteration, speed, theta, m)
         elif field_name == 'envelope':
-            E, info_e = self.__envelope__(iteration,m,env_kw)
+            E, info_e = self.__envelope__(iteration,m,theta,env_kw)
         else:
             E, info_e = self.ts.get_field(field=field_name, coord=coord,
                                           iteration=iteration, theta=theta, m=m)
@@ -963,7 +963,7 @@ class Diag(object):
                 E = self.__force__(coord, iteration, speed, theta=T, m=m)[0]
                 field[:,i] = E[Nr:,nz].copy()
             elif field_name == 'envelope':
-                E = self.__envelope__(iteration,m,env_kw)[0]
+                E = self.__envelope__(iteration,m,theta,env_kw)[0]
                 field[:,i] = E[Nr:,nz].copy()
             else:
                 E = self.ts.get_field(field=field_name, coord=coord,
