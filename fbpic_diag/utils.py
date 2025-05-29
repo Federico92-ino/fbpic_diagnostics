@@ -162,7 +162,11 @@ def weighted_median(x,w=None):
         if any(w > midpoint):
             return (x[np.ma.argmax(w)])[0]
         cumulative_weight = np.ma.cumsum(sorted_w)
-        below_midpoint_index = np.ma.where(cumulative_weight <= midpoint)[0][-1]
+        below_midpoint_indexes = np.ma.where(cumulative_weight <= midpoint)[0]
+        if below_midpoint_indexes.size == 0:
+            return np.nan
+        else:
+            below_midpoint_index = below_midpoint_indexes[-1]
         if np.ma.abs(cumulative_weight[below_midpoint_index] - midpoint) < sys.float_info.epsilon:
             return np.ma.mean(sorted_x[below_midpoint_index:below_midpoint_index+2])
         return sorted_x[below_midpoint_index+1]
