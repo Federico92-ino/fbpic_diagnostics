@@ -149,25 +149,24 @@ def weighted_median(x,w=None):
         w: iterable or None
             Array of weights; if None return standard median
     """
-    try:
-        if w is None:
-            return np.ma.median(x)
-        if all((isinstance(tmp,np.ndarray) for tmp in (x,w))):
-            pass
-        else:
-            x,w = map(np.array,(x,w))
-        if any(w > 0):
-            sorted_w = w[np.ma.argsort(x)]
-            sorted_x = np.ma.sort(x)
-            midpoint = 0.5 * np.ma.sum(sorted_w)
-            if any(w > midpoint):
-                return (x[np.ma.argmax(w)])[0]
-            cumulative_weight = np.ma.cumsum(sorted_w)
-            below_midpoint_index = np.ma.where(cumulative_weight <= midpoint)[0][-1]
-            if np.ma.abs(cumulative_weight[below_midpoint_index] - midpoint) < sys.float_info.epsilon:
-                return np.ma.mean(sorted_x[below_midpoint_index:below_midpoint_index+2])
-            return sorted_x[below_midpoint_index+1]
-    except:
+    if w is None:
+        return np.ma.median(x)
+    if all((isinstance(tmp,np.ndarray) for tmp in (x,w))):
+        pass
+    else:
+        x,w = map(np.array,(x,w))
+    if any(w > 0):
+        sorted_w = w[np.ma.argsort(x)]
+        sorted_x = np.ma.sort(x)
+        midpoint = 0.5 * np.ma.sum(sorted_w)
+        if any(w > midpoint):
+            return (x[np.ma.argmax(w)])[0]
+        cumulative_weight = np.ma.cumsum(sorted_w)
+        below_midpoint_index = np.ma.where(cumulative_weight <= midpoint)[0][-1]
+        if np.ma.abs(cumulative_weight[below_midpoint_index] - midpoint) < sys.float_info.epsilon:
+            return np.ma.mean(sorted_x[below_midpoint_index:below_midpoint_index+2])
+        return sorted_x[below_midpoint_index+1]
+    else:
         return np.nan
     
 def median_absolute_deviation(x, w):
