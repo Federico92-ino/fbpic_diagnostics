@@ -150,12 +150,12 @@ def weighted_median(x,w=None):
             Array of weights; if None return standard median
     """
     try:
+        if w is None:
+            return np.ma.median(x)
         if all((isinstance(tmp,np.ndarray) for tmp in (x,w))):
             pass
         else:
             x,w = map(np.array,(x,w))
-        if w is None:
-            return np.ma.median(x)
         if any(w > 0):
             sorted_w = w[np.ma.argsort(x)]
             sorted_x = np.ma.sort(x)
