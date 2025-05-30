@@ -208,10 +208,10 @@ class Diag(object):
                         r = info.r[Mask.mask]
                         P[k] = r.max()
                     elif method=='rms':
-                        P[k] = np.sqrt(2)*central_average(info.r,field)
+                        P[k] = np.sqrt(2)*central_average(info.r,field,'rms')
                     elif method=='fit':
                         r_mean=mean(info.r,field)
-                        r_std=central_average(info.r,field)
+                        r_std=central_average(info.r,field,'rms')
                         params,_ = curve_fit(gauss_fit,info.r,field,[a0,r_mean,r_std],**curve_fit_kw)
                         P[k] = params[2]
                     else:
@@ -988,7 +988,7 @@ class Diag(object):
 
     def bunch_properties_evolution(self, select, property, species=None, trans_space='x',
                                     t_lim=False, output=True, plot=False,
-                                    norm_z=1, Norm=1., energy_calc_type='rms', **kwargs):
+                                    norm_z=1, Norm=1., statistics='rms', **kwargs):
         """
         Method to select a bunch and to plot the evolution of
         its characteristics along propagation length
@@ -1083,7 +1083,11 @@ class Diag(object):
         else:
             if property == 'charge':
                 q = self.ts.get_particle(['charge'], t=self.t[-1], species=species)[0]
-
+            match statistics:
+                case 'rms':
+                    Mean = mean
+                case 'mad':
+                    Mean = weighted_median
             for k, i in enumerate(t):
                 if property == 'ph_emit_n':
                     if select is None or isinstance(select,ParticleTracker):
@@ -1095,8 +1099,8 @@ class Diag(object):
                     else:    
                         x, ux, z, w = self.ts.get_particle([A,B, 'z', 'w'],t=i,
                                 select=select,species=species)                        
-                    a[k] = emittance(x, ux, w)
-                    Z[k] = mean(z,w)                       
+                    a[k] = emittance(x, ux, w, statistics)
+                    Z[k] = Mean(z,w)                       
                     continue
                 elif property == 'beam_size':
                     if select is None or isinstance(select,ParticleTracker):
@@ -1105,8 +1109,8 @@ class Diag(object):
                         x, z, w = self.__select_by_div__([A,'z','w'], t=i, select=select, species=species)
                     else:
                         x, z, w = self.ts.get_particle([A,'z','w'], t=i, select=select, species=species)
-                    a[k] = central_average(x, w)
-                    Z[k] = mean(z,w)
+                    a[k] = central_average(x, w, statistics)
+                    Z[k] = Mean(z,w)
                     continue
                 elif property == 'momenta_spread':
                     if select is None or isinstance(select,ParticleTracker):
@@ -1115,8 +1119,8 @@ class Diag(object):
                         ux, z, w = self.__select_by_div__([B,'z','w'], t=i, select=select, species=species)
                     else:                            
                         ux, z, w = self.ts.get_particle([B,'z','w'], t=i, select=select, species=species)
-                    a[k] = central_average(ux, w)
-                    Z[k] = mean(z,w)
+                    a[k] = central_average(ux, w, statistics)
+                    Z[k] = Mean(z,w)
                     continue
                 elif property == 'divergence':
                     if select is None or isinstance(select,ParticleTracker):
@@ -1126,8 +1130,8 @@ class Diag(object):
                     else:                            
                         ux, uz, z, w = self.ts.get_particle([B,'uz','z','w'], t=i, select=select, species=species)
                     slope = divergence(px=ux,pz=uz)
-                    a[k] = central_average(slope,w)
-                    Z[k] = mean(z,w)
+                    a[k] = central_average(slope,w,statistics)
+                    Z[k] = Mean(z,w)
                     continue
                 elif property == 'solid_div':
                     if select is None or isinstance(select,ParticleTracker):
@@ -1137,8 +1141,8 @@ class Diag(object):
                     else:                            
                         ux, uy, uz, z, w = self.ts.get_particle(['ux','uy','uz','z','w'], t=i, select=select, species=species)
                     solid = divergence(ux,uy,uz)
-                    a[k] = central_average(solid,w)
-                    Z[k] = mean(z,w)
+                    a[k] = central_average(solid,w,statistics)
+                    Z[k] = Mean(z,w)
                     continue
                 elif property == 'charge':
                     if select is None or isinstance(select,ParticleTracker):
@@ -1148,7 +1152,7 @@ class Diag(object):
                     else:
                         z, w = self.ts.get_particle(['z','w'], t=i, select=select, species=species)
                     a[k] = q*np.nansum(w)*inv_ptcl_percent
-                    Z[k] = mean(z,w)
+                    Z[k] = Mean(z,w)
                     continue
                 elif property == 'mean_energy':
                     if select is None or isinstance(select,ParticleTracker):
@@ -1157,12 +1161,8 @@ class Diag(object):
                         gamma, z, w = self.__select_by_div__(['gamma','z','w'], t=i, select=select, species=species)
                     else:                                
                         gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
-                    match energy_calc_type:
-                        case 'rms':
-                            a[k] = mean(gamma,w)*(m_e*c**2/e)*1e-6
-                        case 'mad':
-                            a[k] = weighted_median(gamma,w)*(m_e*c**2/e)*1e-6
-                    Z[k] = mean(z,w)
+                    a[k] = Mean(gamma,w)*(m_e*c**2/e)*1e-6
+                    Z[k] = Mean(z,w)
                     continue
                 elif property == 'en_spread':
                     if select is None or isinstance(select,ParticleTracker):
@@ -1171,8 +1171,8 @@ class Diag(object):
                         gamma, z, w = self.__select_by_div__(['gamma','z','w'], t=i, select=select, species=species)
                     else:                            
                         gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
-                    a[k] = energy_spread(gamma, w, energy_calc_type)
-                    Z[k] = mean(z,w)
+                    a[k] = energy_spread(gamma, w, statistics)
+                    Z[k] = Mean(z,w)
                     continue
                 elif property == 'tr_emit':
                     if select is None or isinstance(select,ParticleTracker):
@@ -1182,8 +1182,8 @@ class Diag(object):
                     else:                            
                         x, ux, uz, z, w = self.ts.get_particle([A,B,'uz','z','w'], t=i, select=select, species=species)
                     slope = divergence(px=ux, pz=uz)
-                    a[k] = emittance(x, slope, w)
-                    Z[k] = mean(z,w)
+                    a[k] = emittance(x, slope, w, statistics)
+                    Z[k] = Mean(z,w)
                     continue
                 elif property in ['tw_alpha','tw_beta','tw_gamma']:
                     if select is None or isinstance(select,ParticleTracker):
@@ -1192,8 +1192,8 @@ class Diag(object):
                         x, ux, uz, z, w = self.__select_by_div__([A,B,'uz','z','w'], t=i, select=select, species=species)
                     else:                            
                         x, ux, uz, z, w = self.ts.get_particle([A,B,'uz','z','w'], t=i, select=select, species=species)
-                    a[k] = twiss(x, ux, uz, w, property.replace('tw_',''))
-                    Z[k] = mean(z,w)
+                    a[k] = twiss(x, ux, uz, w, property.replace('tw_',''),statistics)
+                    Z[k] = Mean(z,w)
             if output:
                 return Z, a
             if plot:
@@ -1595,7 +1595,7 @@ class Diag(object):
     def joined_species_beam_properties(self, property, species_list,
                                        select_list, trans_space='x',
                                        t_lim=False, output=True, plot=False,
-                                       norm_z=1, Norm=1., energy_calc_type='rms', **kwargs):
+                                       norm_z=1, Norm=1., statistics='rms', **kwargs):
         """
         Method to select particles from several species and calculate properties
         of the resulting bunch as a whole
@@ -1684,6 +1684,11 @@ class Diag(object):
                              "Available properties are:\n -{:s}\nTry again".format(prop))
         else:
             Q = dict()
+            match statistics:
+                case 'rms':
+                    Mean = mean
+                case 'mad':
+                    Mean = weighted_median
             species_select = np.stack((species_list,select_list),axis=1)
             for species in species_list:
                 Q[species] = self.ts.get_particle(['charge'], t=self.t[-1], species=species)[0]
@@ -1710,8 +1715,8 @@ class Diag(object):
                         m = np.append(m,ux)
                         n = np.append(n,z)
                         o = np.append(o,w)
-                    a[k] = emittance(l, m, o)
-                    Z[k] = mean(n,o)                       
+                    a[k] = emittance(l, m, o, statistics)
+                    Z[k] = Mean(n,o)                       
                     continue
                 elif property == 'beam_size':
                     for species,select in species_select:
@@ -1724,8 +1729,8 @@ class Diag(object):
                         l = np.append(l,x)
                         m = np.append(m,z)
                         n = np.append(n,w)
-                    a[k] = central_average(l,n)
-                    Z[k] = mean(m,n)
+                    a[k] = central_average(l,n,statistics)
+                    Z[k] = Mean(m,n)
                     continue
                 elif property == 'momenta_spread':
                     for species,select in species_select:
@@ -1738,8 +1743,8 @@ class Diag(object):
                         l = np.append(l,ux)
                         m = np.append(m,z)
                         n = np.append(n,w)
-                    a[k] = central_average(l,n)
-                    Z[k] = mean(m,n)
+                    a[k] = central_average(l,n,statistics)
+                    Z[k] = Mean(m,n)
                     continue
                 elif property == 'divergence':
                     for species,select in species_select:
@@ -1754,8 +1759,8 @@ class Diag(object):
                         n = np.append(n,z)
                         o = np.append(o,w)
                     slope = divergence(px=l,pz=m)
-                    a[k] = central_average(slope,o)
-                    Z[k] = mean(n,o)
+                    a[k] = central_average(slope,o,statistics)
+                    Z[k] = Mean(n,o)
                     continue
                 elif property == 'solid_div':
                     for species,select in species_select:
@@ -1771,8 +1776,8 @@ class Diag(object):
                         o = np.append(o,z)
                         p = np.append(p,w)
                     solid = divergence(l,m,n)
-                    a[k] = central_average(solid,p)
-                    Z[k] = mean(o,p)
+                    a[k] = central_average(solid,p,statistics)
+                    Z[k] = Mean(o,p)
                     continue
                 elif property == 'charge':
                     l,m = [np.empty(0) for _ in range(2)]
@@ -1790,7 +1795,7 @@ class Diag(object):
                         l = np.append(l,z)
                         m = np.append(m,Q[species]*w*ipp)
                     a[k] = np.nansum(m)
-                    Z[k] = mean(l,np.abs(m))
+                    Z[k] = Mean(l,np.abs(m))
                     continue
                 elif property == 'mean_energy':
                     for species,select in species_select:
@@ -1803,12 +1808,8 @@ class Diag(object):
                         l = np.append(l,gamma)
                         m = np.append(m,z)
                         n = np.append(n,w)
-                    match energy_calc_type:
-                        case 'rms':
-                            a[k] = mean(l,n)*(m_e*c**2/e)*1e-6
-                        case 'mad':
-                            a[k] = weighted_median(l,n)*(m_e*c**2/e)*11e-6
-                    Z[k] = mean(m,n)
+                    a[k] = Mean(l,n)*(m_e*c**2/e)*1e-6
+                    Z[k] = Mean(m,n)
                     continue
                 elif property == 'en_spread':
                     for species,select in species_select:
@@ -1821,8 +1822,8 @@ class Diag(object):
                         l = np.append(l,gamma)
                         m = np.append(m,z)
                         n = np.append(n,w)
-                    a[k] = energy_spread(l, n, energy_calc_type)
-                    Z[k] = mean(m,n)
+                    a[k] = energy_spread(l, n, statistics)
+                    Z[k] = Mean(m,n)
                     continue
                 elif property == 'tr_emit':
                     for species,select in species_select:
@@ -1838,8 +1839,8 @@ class Diag(object):
                         o = np.append(o,z)
                         p = np.append(p,w)
                     slope = divergence(px=m, pz=n)
-                    a[k] = emittance(l, slope, p)
-                    Z[k] = mean(o,p)
+                    a[k] = emittance(l, slope, p, statistics)
+                    Z[k] = Mean(o,p)
                     continue
                 elif property in ['tw_alpha','tw_beta','tw_gamma']:
                     for species,select in species_select:
@@ -1854,8 +1855,8 @@ class Diag(object):
                         n = np.append(n,uz)
                         o = np.append(o,z)
                         p = np.append(p,w)
-                    a[k] = twiss(l, m, n, p, property.replace('tw_',''))
-                    Z[k] = mean(o,p)
+                    a[k] = twiss(l, m, n, p, property.replace('tw_',''), statistics)
+                    Z[k] = Mean(o,p)
             if output:
                 return Z, a
             if plot:

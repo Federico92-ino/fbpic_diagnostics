@@ -30,112 +30,9 @@ def divergence(px=None, py=None, pz=None):
 
     return div
 
-def central_average(x, w):
-
-    """
-    Function to calculate the second order momentum of quantity x
-    with w-distribution.
-    **Parameters**
-    x: 1darrays of particles' phase space coord
-    w: ndarray of particles' weights
-    **Returns**
-    average: float
-    """
-    x_mean = np.ma.average(x, weights=w)
-    sigma_x2 = np.ma.average((x-x_mean)**2, weights=w)
-    average = np.sqrt(sigma_x2)
-    return average
-
-def covar(x, ux, w):
-
-    """
-    Function to calculate covariance of x, ux variables.
-    **Parameters**
-    x, ux: two 1darrays of  phase-space coords
-    w: ndarray of particles' weights
-    **Returns**
-    covariance: float
-    """
-    x_mean = np.ma.average(x, weights=w)
-    ux_mean = np.ma.average(ux, weights=w)
-    covariance = np.ma.average((x-x_mean)*(ux-ux_mean), weights=w)
-    return covariance
-
-def emittance(x, ux, w):
-
-    """
-    Function to calculate emittance of a bunch.
-    **Parameters**
-    x, ux: two 1darrays of  phase-space coords
-    w: ndarray of particles' weights
-    **Returns**
-    emittance: float
-    """
-    sigma_x = central_average(x, w)
-    sigma_ux = central_average(ux, w)
-    covariance = covar(x, ux, w)
-
-    emit = np.sqrt(sigma_x**2*sigma_ux**2-covariance**2)
-
-    return emit
-
-def twiss(x, px, pz, w, type):
-
-    """
-    Function to calulate the Courant-Snyder parameters
-    of the bunch
-    **Parameters**
-    x: np.array
-        The space coords of particle.
-    px, pz: np.arrays
-        The transverse and longitudinal momenta of particles
-        to calculate the planar slice slope corresponding to 'x'
-    w: np.array
-        Weights of particles
-    type: str
-        'alpha', 'beta', or 'gamma' to select the desired twiss
-    **Returns**
-    tw: float
-        Twiss parameter specified
-    """
-    slope = divergence(px=px, pz=pz)
-    emit = emittance(x, slope, w)
-    inv_emit = 1/emit
-    if type == 'alpha':
-        covariance = covar(x, slope, w)
-        tw = covariance*(-inv_emit)
-    elif type == 'beta':
-        sigma_x = central_average(x, w)
-        tw = sigma_x**2*inv_emit
-    elif type == 'gamma':
-        sigma_slope = central_average(slope, w)
-        tw = sigma_slope**2*inv_emit
-
-    return tw
-
 def mean(x, w):
     m = np.ma.average(x, weights=w)
     return m
-
-def energy_spread(gamma, w, kind):
-
-    """
-    Function to calculate energy spread of bunch's energy spectra
-    **Parameters**
-        gamma: float, array
-            An array of normalized energy values
-        w: float, array
-            An array of weights
-    """
-    match kind:
-        case 'rms':
-            Mean = mean(gamma,w)
-            dev = central_average(gamma, w)
-        case 'mad':
-            Mean = weighted_median(gamma, w)
-            dev = median_absolute_deviation(gamma, w)*1.4826
-    sigma = dev/Mean
-    return sigma
 
 def weighted_median(x,w=None):
 
@@ -173,7 +70,115 @@ def weighted_median(x,w=None):
     else:
         return np.nan
     
-def median_absolute_deviation(x, w):
-    median = weighted_median(x, w)
-    mad = weighted_median(np.ma.abs(x-median),w)
-    return mad
+def central_average(x, w, kind):
+
+    """
+    Function to calculate the second order momentum of quantity x
+    with w-distribution.
+    **Parameters**
+    x: 1darrays of particles' phase space coord
+    w: ndarray of particles' weights
+    **Returns**
+    average: float
+    """
+    match kind:
+        case 'rms':
+            x_mean = mean(x,w)
+            average = np.sqrt(mean((x-x_mean)**2, w))
+        case 'mad':
+            x_mean = weighted_median(x,w)
+            average = weighted_median(np.ma.abs(x-x_mean),w)*1.4826
+    return average
+
+def covar(x, ux, w, kind):
+
+    """
+    Function to calculate covariance of x, ux variables.
+    **Parameters**
+    x, ux: two 1darrays of  phase-space coords
+    w: ndarray of particles' weights
+    **Returns**
+    covariance: float
+    """
+    match kind:
+        case 'rms':
+            x_mean = mean(x, w)
+            ux_mean = mean(ux, w)
+            covariance = mean((x-x_mean)*(ux-ux_mean), w)
+        case 'mad':
+            x_mean = weighted_median(x,w)
+            ux_mean = weighted_median(ux,w)
+            covariance = weighted_median((x-x_mean)*(ux-ux_mean),w)    
+    return covariance
+
+def emittance(x, ux, w,kind):
+
+    """
+    Function to calculate emittance of a bunch.
+    **Parameters**
+    x, ux: two 1darrays of  phase-space coords
+    w: ndarray of particles' weights
+    **Returns**
+    emittance: float
+    """
+    sigma_x = central_average(x, w, kind)
+    sigma_ux = central_average(ux, w, kind)
+    covariance = covar(x, ux, w, kind)
+
+    emit = np.sqrt(sigma_x**2*sigma_ux**2-covariance**2)
+
+    return emit
+
+def twiss(x, px, pz, w, type, kind):
+
+    """
+    Function to calulate the Courant-Snyder parameters
+    of the bunch
+    **Parameters**
+    x: np.array
+        The space coords of particle.
+    px, pz: np.arrays
+        The transverse and longitudinal momenta of particles
+        to calculate the planar slice slope corresponding to 'x'
+    w: np.array
+        Weights of particles
+    type: str
+        'alpha', 'beta', or 'gamma' to select the desired twiss
+    **Returns**
+    tw: float
+        Twiss parameter specified
+    """
+    slope = divergence(px=px, pz=pz)
+    emit = emittance(x, slope, w,kind)
+    inv_emit = 1/emit
+    if type == 'alpha':
+        covariance = covar(x, slope, w, kind)
+        tw = covariance*(-inv_emit)
+    elif type == 'beta':
+        sigma_x = central_average(x, w, kind)
+        tw = sigma_x**2*inv_emit
+    elif type == 'gamma':
+        sigma_slope = central_average(slope, w, kind)
+        tw = sigma_slope**2*inv_emit
+
+    return tw
+
+def energy_spread(gamma, w, kind):
+
+    """
+    Function to calculate energy spread of bunch's energy spectra
+    **Parameters**
+        gamma: float, array
+            An array of normalized energy values
+        w: float, array
+            An array of weights
+    """
+    match kind:
+        case 'rms':
+            Mean = mean(gamma,w)
+        case 'mad':
+            Mean = weighted_median(gamma, w)
+    dev = central_average(gamma, w, kind)
+    sigma = dev/Mean
+    return sigma
+
