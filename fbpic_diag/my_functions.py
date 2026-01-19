@@ -1147,22 +1147,40 @@ class Diag(object):
                     Z[k] = Mean(z,w)
                     continue
                 elif property == 'mean_energy':
-                    if select is None or isinstance(select,ParticleTracker):
-                        gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
-                    elif 'div' in select:
-                        gamma, z, w = self.__select_by_div__(['gamma','z','w'], t=i, select=select, species=species)
-                    else:                                
-                        gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
+                    if 'gamma' in self.avail_record_components[species]:
+                        if select is None or isinstance(select,ParticleTracker):
+                            gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
+                        elif 'div' in select:
+                            gamma, z, w = self.__select_by_div__(['gamma','z','w'], t=i, select=select, species=species)
+                        else:                                
+                            gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
+                    elif 'gamma' not in self.avail_record_components[species]:
+                        if select is None or isinstance(select,ParticleTracker):
+                            ux, uy, uz, z, w = self.ts.get_particle(['ux','uy','uz','z','w'], t=i, select=select, species=species)
+                        elif 'div' in select:
+                            ux, uy, uz, z, w = self.__select_by_div__(['ux','uy','uz','z','w'], t=i, select=select, species=species)
+                        else:                                
+                            ux, uy, uz, z, w = self.ts.get_particle(['ux','uy','uz','z','w'], t=i, select=select, species=species)
+                        gamma = np.sqrt(1+ux**2+uy**2+uz**2)
                     a[k] = Mean(gamma,w)*(m_e*c**2/e)*1e-6
                     Z[k] = Mean(z,w)
                     continue
                 elif property == 'en_spread':
-                    if select is None or isinstance(select,ParticleTracker):
-                        gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
-                    elif 'div' in select:
-                        gamma, z, w = self.__select_by_div__(['gamma','z','w'], t=i, select=select, species=species)
-                    else:                            
-                        gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
+                    if 'gamma' in self.avail_record_components[species]:
+                        if select is None or isinstance(select,ParticleTracker):
+                            gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
+                        elif 'div' in select:
+                            gamma, z, w = self.__select_by_div__(['gamma','z','w'], t=i, select=select, species=species)
+                        else:                                
+                            gamma, z, w = self.ts.get_particle(['gamma','z','w'], t=i, select=select, species=species)
+                    elif 'gamma' not in self.avail_record_components[species]:
+                        if select is None or isinstance(select,ParticleTracker):
+                            ux, uy, uz, z, w = self.ts.get_particle(['ux','uy','uz','z','w'], t=i, select=select, species=species)
+                        elif 'div' in select:
+                            ux, uy, uz, z, w = self.__select_by_div__(['ux','uy','uz','z','w'], t=i, select=select, species=species)
+                        else:                                
+                            ux, uy, uz, z, w = self.ts.get_particle(['ux','uy','uz','z','w'], t=i, select=select, species=species)
+                        gamma = np.sqrt(1+ux**2+uy**2+uz**2)
                     a[k] = energy_spread(gamma, w, statistics)
                     Z[k] = Mean(z,w)
                     continue
