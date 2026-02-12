@@ -227,6 +227,12 @@ class Diag(object):
                 P[k] = 2*pi*np.trapz(np.trapz(u[Nr:,:],dx=info.dz,axis=1)*info.r[Nr:],dx=info.dr)
         return P
 
+    def __gamma___(self,species=None,t=None,iteration=None,select=None):
+        ux,uy,uz = self.ts.get_particle(['ux','uy','uz'], species,
+                                        t,iteration,select)
+        gamma = np.sqrt(1+ux**2+uy**2+uz**2)
+        return gamma
+
     def slice_emit(self, N, select=None, species=None, iteration=None,
                     plot=False, components=['x','ux'], mask=0., trans_space='x',
                     z0=0., norms=[1.,1.], **kwargs):
@@ -382,32 +388,32 @@ class Diag(object):
             elif 'div_y' in components:
                 if components.index('div_y') == 0:
                     if select is None or isinstance(select,ParticleTracker):
-                        px, pz, comp2, weight = \
-                            self.ts.get_particle(['ux', 'uz', components[1], 'w'], iteration=iteration,
+                        py, pz, comp2, weight = \
+                            self.ts.get_particle(['uy', 'uz', components[1], 'w'], iteration=iteration,
                                                  select=select, species=species)                        
                     elif 'div' in select:
-                        px, pz, comp2, weight = \
-                            self.__select_by_div__(['ux', 'uz', components[1], 'w'], iteration=iteration,
+                        py, pz, comp2, weight = \
+                            self.__select_by_div__(['uy', 'uz', components[1], 'w'], iteration=iteration,
                                                  select=select, species=species)    
                     else:
-                        px, pz, comp2, weight = \
-                            self.ts.get_particle(['ux', 'uz', components[1], 'w'], iteration=iteration,
+                        py, pz, comp2, weight = \
+                            self.ts.get_particle(['uy', 'uz', components[1], 'w'], iteration=iteration,
                                                  select=select, species=species)
-                    comp1 = divergence(px=px, pz=pz)
+                    comp1 = divergence(px=py, pz=pz)
                 else:
                     if select is None or isinstance(select,ParticleTracker):
-                        px, pz, comp1, weight = \
-                            self.ts.get_particle(['ux', 'uz', components[0], 'w'], iteration=iteration,
+                        py, pz, comp1, weight = \
+                            self.ts.get_particle(['uy', 'uz', components[0], 'w'], iteration=iteration,
                                                  select=select, species=species)
                     elif 'div' in select:
-                        px, pz, comp1, weight = \
-                            self.ts.get_particle(['ux', 'uz', components[0], 'w'], iteration=iteration,
+                        py, pz, comp1, weight = \
+                            self.ts.get_particle(['uy', 'uz', components[0], 'w'], iteration=iteration,
                                                  select=select, species=species)
                     else:
-                        px, pz, comp1, weight = \
-                            self.ts.get_particle(['ux', 'uz', components[0], 'w'], iteration=iteration,
+                        py, pz, comp1, weight = \
+                            self.ts.get_particle(['uy', 'uz', components[0], 'w'], iteration=iteration,
                                                  select=select, species=species)
-                    comp2 = divergence(px=px, pz=pz)
+                    comp2 = divergence(px=py, pz=pz)
             elif 'div2' in components:
                 if components.index('div_x') == 0:
                     if select is None or isinstance(select,ParticleTracker):
@@ -831,7 +837,7 @@ class Diag(object):
             Set in meters^-1; default is [1.,1.].
 
         output: bool
-            If True it returns x-axis and field values         
+            If True it returns field values and axes extent        
 
         **kwargs: keywords to pass to .Axes.imshow() method
 
@@ -1212,7 +1218,7 @@ class Diag(object):
     def spectrum(self, component, iteration, select=None, species=None,
                 norm_z =1., output=False, charge=False, plot=True, **kwargs):
         """
-        Method to easily get an energy spectrum of 'selected' particles
+        Method to easily get 'component' distribution of 'selected' particles
 
         **Parameters**
 
@@ -1447,29 +1453,6 @@ class Diag(object):
 
         if len(components) > 2:
             raise ValueError("List of components must be of length 2!")
-
-        def if_not_div(components):
-            if 'div_' in components[0] or 'div_' in components[1]:
-                return False
-            else:
-                return True
-
-        def where_div(components):
-            if 'div_' in components[0] and 'div_' not in components[1]:
-                return 0
-            elif 'div_' in components[1] and 'div_' not in components[0]:
-                return 1
-            else:
-                return 'both'
-
-        def which_div(components,where):
-            dictio=dict()
-            if where == 'both':
-                for i,div in enumerate(components):
-                    dictio[i] = div.split('_')[1]
-            else:
-                dictio[where] = components[where].split('_')[1]
-            return dictio
 
         if if_not_div(components):
             if select is None or isinstance(select,ParticleTracker):

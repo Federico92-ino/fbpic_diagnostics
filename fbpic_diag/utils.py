@@ -31,6 +31,8 @@ def divergence(px=None, py=None, pz=None):
     return div
 
 def mean(x, w):
+    x = np.ma.masked_invalid(x)
+    w = np.ma.masked_invalid(w)
     m = np.ma.average(x, weights=w)
     return m
 
@@ -47,11 +49,12 @@ def weighted_median(x,w=None):
             Array of weights; if None return standard median
     """
     if w is None:
+        x = np.ma.masked_invalid(x)
         return np.ma.median(x)
     if all((isinstance(tmp,np.ndarray) for tmp in (x,w))):
         pass
     else:
-        x,w = map(np.array,(x,w))
+        x,w = map(np.ma.masked_invalid,(x,w))
     if any(w > 0):
         sorted_w = w[np.ma.argsort(x)]
         sorted_x = np.ma.sort(x)
@@ -87,7 +90,7 @@ def central_average(x, w, kind):
             average = np.sqrt(mean((x-x_mean)**2, w))
         case 'mad':
             x_mean = weighted_median(x,w)
-            average = weighted_median(np.ma.abs(x-x_mean),w)*1.4826
+            average = weighted_median(abs(x-x_mean),w)*1.4826
     return average
 
 def covar(x, ux, w, kind):
@@ -182,3 +185,23 @@ def energy_spread(gamma, w, kind):
     sigma = dev/Mean
     return sigma
 
+def if_not_div(components):
+    if 'div_' in components[0] or 'div_' in components[1]:
+        return False
+    else:
+        return True
+def where_div(components):
+    if 'div_' in components[0] and 'div_' not in components[1]:
+        return 0
+    elif 'div_' in components[1] and 'div_' not in components[0]:
+        return 1
+    else:
+        return 'both'
+def which_div(components,where):
+    dictio=dict()
+    if where == 'both':
+        for i,div in enumerate(components):
+            dictio[i] = div.split('_')[1]
+    else:
+        dictio[where] = components[where].split('_')[1]
+    return dictio
