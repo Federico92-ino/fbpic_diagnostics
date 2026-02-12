@@ -51,8 +51,6 @@ def weighted_median(x,w=None):
     if w is None:
         x = np.ma.masked_invalid(x)
         return np.ma.median(x)
-    if all((isinstance(tmp,np.ndarray) for tmp in (x,w))):
-        pass
     else:
         x,w = map(np.ma.masked_invalid,(x,w))
     if any(w > 0):
