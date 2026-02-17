@@ -965,7 +965,7 @@ class Diag(object):
 
     def transverse_map(self, field_name, coord=None, m='all',
                         iteration=0,zpos=None,max_resolution_3d=[1000,500],
-                        normalize=False, A0=None, norms=[1.,1.], output=False, mask=None, env_kw=None, **kwargs):
+                        normalize=False, A0=None, norms=[1.,1.], output=False, mask=None, env_kw=dict(), **kwargs):
         """
         Method to get a 2D-transverse map of passed field_name in the plane y-x;
         y-axis (horizontal) ois in decreasing order, x-axis (vertical) is in increasing order.
