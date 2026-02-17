@@ -301,6 +301,7 @@ class Diag(object):
     def select_particles(self,var_list,select,species,iteration=None,t=None):
         if species is None:
             species = self.avail_species[0]
+        var_list_copy = var_list.copy()
         if 'gamma' in var_list and 'gamma' not in self.avail_record_components[species]:
             gamma_indx = var_list.index('gamma')
             var_list.remove('gamma')
@@ -316,7 +317,7 @@ class Diag(object):
         else:    
             ptcl = self.ts.get_particle(var_list,t=t,iteration=iteration,
                                         select=select,species=species)
-        if 'gamma' not in self.avail_record_components[species]:
+        if 'gamma' in var_list_copy and 'gamma' not in self.avail_record_components[species]:
             ptcl.insert(gamma_indx,gamma)
         return ptcl
     
