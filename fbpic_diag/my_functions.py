@@ -299,8 +299,8 @@ class Diag(object):
         return P
 
     def __gamma___(self,species=None,t=None,iteration=None,select=None):
-        ux,uy,uz = self.select_particles(['ux','uy','uz'], species,
-                                        t,iteration,select)
+        ux,uy,uz = self.select_particles(['ux','uy','uz'],select, species,
+                                        iteration,t)
         gamma = np.sqrt(1+ux**2+uy**2+uz**2)
         return gamma
     
