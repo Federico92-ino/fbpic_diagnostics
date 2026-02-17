@@ -1035,7 +1035,7 @@ class Diag(object):
                 Et = self.ts.data_reader.read_field_circ(field=field_name,coord='t',iteration=iteration,
                                                                 theta=None,m=m,slice_across=None,slice_relative_position=None,
                                                                 max_resolution_3d=max_resolution_3d)[0]
-                X,Y,Z = np.meshgrid(info_e.x,info_e.y,info_e.z)
+                X,Y,Z = np.meshgrid(info_e.x,info_e.y,info_e.z,indexing='ij')
                 T = np.angle(X+1j*Y)
                 if coord == 'x':
                     E = CartField(Er,Et,T,'x')
