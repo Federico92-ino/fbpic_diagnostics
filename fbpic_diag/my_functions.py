@@ -956,7 +956,7 @@ class Diag(object):
             return E, extent
 
     def transverse_map(self, field_name, coord=None, m='all',
-                        iteration=0,zpos=None,max_resolution_3d=[500,1000],
+                        iteration=0,zpos=None,max_resolution_3d=[1000,500],
                         normalize=False, A0=None, norms=[1.,1.], output=False, mask=None, env_kw=None, **kwargs):
         """
         Method to get a 2D-transverse map of passed field_name in the plane y-x;
@@ -989,7 +989,7 @@ class Diag(object):
         max_resolution_3d: list of ints
             A list of two integers to set the maximum resolution of the 3D-box;
             first value is for longitudinal resolution, second value is for transverse resolution.
-            Default is [500,1000], resulting in 3D-array of shape (500,500,1000).
+            Default is [1000,500], resulting in 3D-array of shape (500,500,1000).
         norms: list of floats
             A list of two float constants to multiply the values
             of both axis for normalization or magnitude changings; 
@@ -1045,7 +1045,7 @@ class Diag(object):
             z_indx = int(.5*len(info_e.z))
         else:
             Nz = len(info_e.z)
-            z_indx = Nz+int((zpos-info_e.z(Nz))/info_e.dz)
+            z_indx = Nz+int((zpos-info_e.z[Nz])/info_e.dz)
             if abs(zpos-info_e.z[z_indx])> abs(zpos-info_e.z[z_indx+1]):
                 z_indx+=1
         tranE = np.fliplr(E[:,:,z_indx])
