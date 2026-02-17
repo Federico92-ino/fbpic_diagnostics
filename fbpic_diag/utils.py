@@ -1,4 +1,5 @@
-import numpy as np 
+import numpy as np
+from scipy.constants import pi
 import sys
 def divergence(px=None, py=None, pz=None):
 
@@ -203,3 +204,25 @@ def which_div(components,where):
     else:
         dictio[where] = components[where].split('_')[1]
     return dictio
+
+def CartField(Fr,Ft,theta,coord):
+    if coord == 'x':
+        F = Fr*np.cos(theta)-Ft*np.sin(theta)
+    elif coord == 'y':
+        F = Fr*np.sin(theta)+Ft*np.cos(theta)
+    return F
+
+def length_um(factor=1):
+    match factor:
+        case 1:
+            return '[m]'
+        case 1e2:
+            return '[cm]'
+        case 1e3:
+            return '[mm]'
+        case 1e6:
+            return '[$\mu$m]'
+        case 1e9:
+            return '[nm]'
+        case _:
+            return ''

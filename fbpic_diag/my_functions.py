@@ -57,7 +57,7 @@ class Diag(object):
                 N = m_e*omega0*c/e
         return N
 
-    def __potential__(self, iteration, theta=0, m='all'):
+    def __potential__(self, iteration, theta, m, max_resolution_3d,transverse=False):
         """
         Method to integrate electrostatic potential from longitudinal field Ez.
 
@@ -67,15 +67,31 @@ class Diag(object):
             theta, m:
                 Same parameters of .get_field() method.
                 Same defaults (0, 'all')
+            transverse: bool
+                If 'True' returns the transverse potential map instead of the longitudinal one.
+                Default is 'False'.
+            max_resolution_3d: list of int
+                If 'transverse' is 'True', this parameter sets the maximum resolution of the 3D field reconstruction to be read for potential calculation;
+                default is [500,500]
         """
-        Ez, info_e = self.ts.get_field('E', coord='z', iteration=iteration, theta=theta, m=m)
+        if transverse:
+            del theta
+            Ez, info_e = self.ts.data_reader.read_field_circ(field='E', coord='z', iteration=iteration,
+                                                              theta=None, m=m, slice_across=None, slice_relative_position=None,
+                                                              max_resolution_3d=max_resolution_3d)
+        else:
+            Ez, info_e = self.ts.get_field('E', coord='z', iteration=iteration, theta=theta, m=m)
         phi = np.zeros_like(Ez)
         max = Ez.shape[1]
-        for i in range(max-2, -1, -1):
-            phi[:, i] = np.trapz(Ez[:, i:i+2], dx=info_e.dz) + phi[:, i+1]
+        if transverse:
+            for i in range(max-2, -1, -1):
+                phi[:,:,i] = np.trapz(Ez[:,:,i:i+2], dx=info_e.dz) + phi[:,:,i+1]
+        else:
+            for i in range(max-2, -1, -1):
+                phi[:,i] = np.trapz(Ez[:, i:i+2], dx=info_e.dz) + phi[:, i+1]
         return phi, info_e
 
-    def __force__(self, coord, iteration, speed, theta=0, m='all'):
+    def __force__(self, coord, iteration, speed, theta, m, max_resolution_3d,transverse=False):
         """
         Method to calculate transverse components of force .
 
@@ -92,54 +108,105 @@ class Diag(object):
             beta = float(input("To calculate the Lorentz force, enter the proper normalized speed of particles:"))
         else:
             beta = speed
-        if coord == 'x':
-            E, info_e = self.ts.get_field('E', 'x', iteration=iteration, m=m, theta=theta)
-            B, info_b = self.ts.get_field('B', 'y', iteration=iteration, m=m, theta=theta)
-            del info_b
-            F = e*(E - beta*c*B)
-        elif coord == 'y':
-            E, info_e = self.ts.get_field('E', 'y', iteration=iteration, m=m, theta=theta)
-            B, info_b = self.ts.get_field('B', 'x', iteration=iteration, m=m, theta=theta)
-            del info_b
-            F = e*(E + beta*c*B)
-        elif coord == 'r':
-            E, info_e = self.ts.get_field('E', 'r', iteration=iteration, m=m, theta=theta)
-            B, info_b = self.ts.get_field('B', 't', iteration=iteration, m=m, theta=theta)
-            del info_b
-            F = e*(E - beta*c*B)
-        elif coord == 't':
-            E, info_e = self.ts.get_field('E', 't', iteration=iteration, m=m, theta=theta)
-            B, info_b = self.ts.get_field('B', 'r', iteration=iteration, m=m, theta=theta)
-            del info_b
-            F = e*(E + beta*c*B)
-        else:
-            raise ValueError("You must specify a force component in \n"
-                             "\t\a 'x', 'y', 'r' or 't' direction for 'coord'")
-        return F, info_e
+        if transverse:
+            if coord == 'r':
+                E, info = self.ts.data_reader.read_field_circ(field='E', coord=coord, iteration=iteration, m=m, theta=None,
+                                                                slice_across=None, slice_relative_position=None,
+                                                                max_resolution_3d=max_resolution_3d)
+                B = self.ts.data_reader.read_field_circ(field='B', coord='t', iteration=iteration, m=m, theta=None,
+                                                                slice_across=None, slice_relative_position=None,
+                                                                max_resolution_3d=max_resolution_3d)[0]
+                F = e*(E - beta*c*B)
+            elif coord == 't':
+                E, info = self.ts.data_reader.read_field_circ(field='E', coord=coord, iteration=iteration, m=m, theta=None,
+                                                                slice_across=None, slice_relative_position=None,
+                                                                max_resolution_3d=max_resolution_3d)
+                B = self.ts.data_reader.read_field_circ(field='B', coord='r', iteration=iteration, m=m, theta=None,
+                                                                slice_across=None, slice_relative_position=None,
+                                                                max_resolution_3d=max_resolution_3d)[0]
+                F = e*(E + beta*c*B)
+            elif coord=='x' or coord=='y':
+                Er, info = self.ts.data_reader.read_field_circ(field='E', coord='r', iteration=iteration, m=m, theta=None,
+                                                                slice_across=None, slice_relative_position=None,
+                                                                max_resolution_3d=max_resolution_3d)
+                Et = self.ts.data_reader.read_field_circ(field='E', coord='t', iteration=iteration, m=m, theta=None,
+                                                          slice_across=None, slice_relative_position=None,
+                                                          max_resolution_3d=max_resolution_3d)[0]
+                Br = self.ts.data_reader.read_field_circ(field='B', coord='r', iteration=iteration, m=m, theta=None,
+                                                          slice_across=None, slice_relative_position=None,
+                                                          max_resolution_3d=max_resolution_3d)[0]
+                Bt = self.ts.data_reader.read_field_circ(field='B', coord='t', iteration=iteration, m=m, theta=None,
+                                                          slice_across=None, slice_relative_position=None,
+                                                          max_resolution_3d=max_resolution_3d)[0]
+                Gr = Er - beta*c*Bt
+                Gt = Et + beta*c*Br
+                x,y,z = info.x,info.y,info.z
+                X,Y,_= np.meshgrid(x,y,z,indexing='ij')
+                T = np.angle(X+1j*Y)+pi
+                if coord == 'x':
+                    F = CartField(Gr, Gt, T, coord='x')
+                else:
+                    F = CartField(Gr, Gt, T, coord='y')
+            else:
+                raise ValueError("You must specify a force component in \n"
+                                 "\t\a 'x', 'y', 'r' or 't' direction for 'coord'")
+        else:    
+            if coord == 'x':
+                E, info = self.ts.get_field('E', 'x', iteration=iteration, m=m, theta=theta)
+                B = self.ts.get_field('B', 'y', iteration=iteration, m=m, theta=theta)[0]
+                F = e*(E - beta*c*B)
+            elif coord == 'y':
+                E, info = self.ts.get_field('E', 'y', iteration=iteration, m=m, theta=theta)
+                B = self.ts.get_field('B', 'x', iteration=iteration, m=m, theta=theta)[0]
+                F = e*(E + beta*c*B)
+            elif coord == 'r':
+                E, info = self.ts.get_field('E', 'r', iteration=iteration, m=m, theta=theta)
+                B = self.ts.get_field('B', 't', iteration=iteration, m=m, theta=theta)[0]
+                F = e*(E - beta*c*B)
+            elif coord == 't':
+                E, info = self.ts.get_field('E', 't', iteration=iteration, m=m, theta=theta)
+                B = self.ts.get_field('B', 'r', iteration=iteration, m=m, theta=theta)[0]
+                F = e*(E + beta*c*B)
+            else:
+                raise ValueError("You must specify a force component in \n"
+                                 "\t\a 'x', 'y', 'r' or 't' direction for 'coord'")
+        return F, info
 
-    def __envelope__(self, iteration, m, theta, env_kw):
-        Ex, info_e = self.ts.get_field('E','x',iteration=iteration,m=m,theta=theta)
-        Ey, info = self.ts.get_field('E','y',iteration=iteration,m=m,theta=theta)
-        if env_kw:
-            if 'mode' in env_kw:
-                mode = env_kw['mode']
-                del env_kw['mode']
-            EX = np.abs(hilbert(Ex,**env_kw))
-            EY = np.abs(hilbert(Ey,**env_kw))
+    def __envelope__(self, iteration, m, theta, env_kw,max_resolution_3d,transverse=False):
+        if transverse:
+            Er, info = self.ts.data_reader.read_field_circ(field='E', coord='r', iteration=iteration, m=m, theta=None,
+                                                            slice_across=None, slice_relative_position=None,
+                                                            max_resolution_3d=max_resolution_3d)
+            Et = self.ts.data_reader.read_field_circ(field='E', coord='t', iteration=iteration, m=m, theta=None,
+                                                          slice_across=None, slice_relative_position=None,
+                                                          max_resolution_3d=max_resolution_3d)[0]
+            x,y,z = info.x,info.y,info.z
+            X,Y,Z= np.meshgrid(x,y,z,indexing='ij')
+            T = np.angle(X+1j*Y)+pi
         else:
-            mode = "both"
-            EX = np.abs(hilbert(Ex))
-            EY = np.abs(hilbert(Ey))
-
+            Er, info = self.ts.get_field('E','r',iteration=iteration,m=m,theta=theta)
+            Et = self.ts.get_field('E','t',iteration=iteration,m=m,theta=theta)[0]
+            r,z = info.r, info.z
+            R,Z = np.meshgrid(r,z,indexing='ij')
+            T = np.angle(R)+theta
+        try:
+            mode = env_kw['mode']
+        except KeyError:
+            print("You must specify the 'mode' key in 'env_kw' dictionary to choose a calculation; choose one among 'x', 'y' or 'both'.",
+                  "\nDefault has been set to 'both'.")
+            mode = 'both'
         match mode:
             case 'x':
-                E = EX
+                Ex = CartField(Er, Et, T, coord='x')
+                E = np.abs(hilbert(Ex,**env_kw))
             case 'y': 
-                E = EY
+                Ey = CartField(Er, Et, T, coord='y')
+                E = np.abs(hilbert(Ey,**env_kw))
             case "both":
-                E = np.sqrt(EX**2+EY**2)
-        del info
-        return E, info_e
+                ER = np.abs(hilbert(Er,**env_kw))
+                ET = np.abs(hilbert(Et,**env_kw))
+                E = np.sqrt(ER**2+ET**2)
+        return E, info
 
     def __select_by_div__(self,var_list,select,species,iteration=None,t=None):
         alpha = select['div']
@@ -704,8 +771,8 @@ class Diag(object):
                     continue
         return Z*norm_z, a
 
-    def lineout(self, field_name, iteration,
-                coord=None, theta=0, m='all',
+    def lineout(self, field_name,coord=None,
+                iteration=0, theta=0, m='all',
                 normalize=False, A0=None, slicing='z',
                 on_axis=None, z0=0., norm_z=1., output=False, env_kw=None,**kwargs):
         """
@@ -779,12 +846,14 @@ class Diag(object):
             z = info_e.z
             if z0:
                 z = info_e.z+z0
-        else:
+        elif slicing == 'r':
             if on_axis is None:
                 on_axis = info_e.z[int(self.params['Nz']/2)]
             N = int(self.params['Nz']/2) + int((on_axis-info_e.z[int(self.params['Nz']/2)])/info_e.dz)
             E = E[:, N]
             z = info_e.r
+        else:
+            raise ValueError("Slicing direction not recognized. Choose between 'z' and 'r'.")
 
         E0 = 1
         if normalize:
@@ -795,8 +864,8 @@ class Diag(object):
         if output:
             return z*norm_z, E/E0
 
-    def map(self, field_name, iteration,
-            coord=None, theta=0, m='all', normalize=False, A0=None, 
+    def map(self, field_name,coord=None,
+            iteration=0, theta=0, m='all', normalize=False, A0=None, 
             z0=0., norms=[1.,1.], output=False, mask=None,env_kw=None, **kwargs):
         """
         Method to get a 2D-map of passed field_name
@@ -805,17 +874,13 @@ class Diag(object):
 
         field_name: string
             Field to plot
-
         iteration: int
             The same as usual
-
         coord, theta, m: same parameters of .get_field() method.
             Same defaults (None, 0, 'all')
-
         normalize: bool, optional;
             If normalize=True this 'turns on' the normalization.
             Default is 'False'.
-
         A0: float, optional;
             If normalize=True this allows to set the normalizing
             constant.
@@ -825,17 +890,21 @@ class Diag(object):
                density
              - m_e*c*omega_0/e for transverse 'E'
              - m_e*c*omega_p/e for longitudinal 'E'
-
         z0: float, optional
             Transforms z coords into z+z0 coords; to be set in meters.
             Deafult is z0=0.
-
         norms: list of floats
             A list of two float constants to multiply the values
             of both axis for normalization or magnitude changings; 
             norms[0] for z-axis, norms[1] for r-axis.
             Set in meters^-1; default is [1.,1.].
-
+        mask: float
+            A value to mask undesired points in plot; set in units of normalization 
+            if 'normalize' is True, otherwise set in physical units of the field.
+            Default is None (no mask).
+        env_kw: dict
+            A dictionary of keywords to pass to the envelope solver for the chosen 'mode':['x','y','both']
+            and for scipy.signal.hilbert() *args; only used if field_name is 'envelope'.
         output: bool
             If True it returns field values and axes extent        
 
@@ -869,38 +938,42 @@ class Diag(object):
         extent = info_e.imshow_extent.copy()
         if z0:
             extent[0:2]+=z0
-        extent[0:2]*=norms[0]
-        extent[2:4]*=norms[1]
+        extent[:2]*=norms[0]
+        extent[2:]*=norms[1]
         if mask is not None:
             E = np.ma.masked_where(E<=mask*E0,E)
         E /= E0
         plt.imshow(E, extent=extent,
                   origin=origin, **kwargs)
+        plt.xlabel(f"z {length_um(norms[0])}")
+        if theta == 0:
+            plt.ylabel(f"x {length_um(norms[1])}")
+        elif theta == pi/2:
+            plt.ylabel(f"y {length_um(norms[1])}")
+        else:
+            plt.ylabel(f"r {length_um(norms[1])}")
         if output:
             return E, extent
 
-    def transverse_map(self, field_name, iteration, coord=None,
-            m='all', normalize=False, A0=None,
-            z_pos=None, swap_axis=False, norms=[1.,1.], env_kw=None, **kwargs):
+    def transverse_map(self, field_name, coord=None, m='all',
+                        iteration=0,zpos=None,max_resolution_3d=[500,1000],
+                        normalize=False, A0=None, norms=[1.,1.], output=False, mask=None, env_kw=None, **kwargs):
         """
-        Method to get a 2D-transverse map of passed field_name
-        in x-y  or y-x plane
+        Method to get a 2D-transverse map of passed field_name in the plane y-x;
+        y-axis (horizontal) ois in decreasing order, x-axis (vertical) is in increasing order.
+        Based on box resolution reduction, 'theta' = None by default.
 
         **Parameters**
 
         field_name: string
             Field to plot
-
         coord, m: same parameters of .get_field() method.
             Same defaults (None, 0, 'all')
-
         iteration: int
             The same as usual
-
         normalize: bool, optional;
             If normalize=True this 'turns on' the normalization.
             Default is 'False'.
-
         A0: float, optional;
             If normalize=True this allows to set the normalizing
             constant.
@@ -910,80 +983,91 @@ class Diag(object):
                density
              - m_e*c*omega_0/e for transverse 'E'
              - m_e*c*omega_p/e for longitudinal 'E'
-
-        z_pos: float, optional
-            Choose the actual z-position where to slice the considered field_name;
-            to be set in meters. Default is the first slice.
-
-        swap_axis: bool
-            Whether to plot in x-y or y-x plane with inverted y-axis; default is x-y (False)
-
+        zpos: float, optional
+            Physical position of the transverse slice in the 3D-box to be plotted; set in meters.
+            Default is None, in this case the slice is set in the middle of the box.
+        max_resolution_3d: list of ints
+            A list of two integers to set the maximum resolution of the 3D-box;
+            first value is for longitudinal resolution, second value is for transverse resolution.
+            Default is [500,1000], resulting in 3D-array of shape (500,500,1000).
         norms: list of floats
             A list of two float constants to multiply the values
             of both axis for normalization or magnitude changings; 
-            norms[0] for z-axis, norms[1] for r-axis.
+            norms[0] for y-axis, norms[1] for x-axis.
             Set in meters^-1; default is [1.,1.].
+        mask: float
+            A value to mask undesired points in plot; set in units of normalization 
+            if 'normalize' is True, otherwise set in physical units of the field.
+            Default is None (no mask).
+        env_kw: dict
+            A dictionary of keywords to pass to the envelope solver for the chosen 'mode':['x','y','both']
+            and for scipy.signal.hilbert() *args; only used if field_name is 'envelope'.
+        output: bool
+            If True it returns field values and axes extent        
 
-        **kwargs: keywords to pass to .pcolormesh() method
+        **kwargs: keywords to pass to .Axes.imshow() method
 
         """
 
-        Nr = self.params['Nr']
-        test_field = self.avail_fields[0]
-        if self.ts.fields_metadata[test_field]['type'] == 'vector':
-            test_coord =  'x'
-        else:
-            test_coord = None
-        info = self.ts.get_field(test_field,test_coord,iteration=iteration)[1]
-        dz = info.dz
-        dr = info.dr
-        if z_pos == None:
-            z_pos=info.zmin
-        if z_pos < info.zmin or z_pos > info.zmax:
-            raise ValueError('Ehi, watch out!\n'
-                              'z_pos = {:f}  cannot be less than {:f}'
-                              'or greater than {:f} meters'.format(z_pos,info.zmin,info.zmax))
-        nz = int((z_pos-info.zmin)/dz+0.5)
-        theta = np.linspace(0,2*pi*(1+1/Nr),Nr+1)
-        r = np.insert(info.r[Nr:],0,0.)
-        field = np.zeros([Nr,Nr])
-
-        for i,T in enumerate(theta[:-1]):
-            if field_name == 'phi':
-                E = self.__potential__(iteration, theta=T, m=m)[0]
-                field[:,i] = E[Nr:,nz].copy()
-            elif field_name == 'force':
-                if 'speed' in kwargs:
-                    speed = kwargs['speed']
-                    del kwargs['speed']
-                else:
-                    speed = None 
-                E = self.__force__(coord, iteration, speed, theta=T, m=m)[0]
-                field[:,i] = E[Nr:,nz].copy()
-            elif field_name == 'envelope':
-                E = self.__envelope__(iteration,m,theta,env_kw)[0]
-                field[:,i] = E[Nr:,nz].copy()
+        if field_name == 'phi':
+            E, info_e = self.__potential__(iteration,theta=None,m=m,
+                                           max_resolution_3d=max_resolution_3d,transverse=True)
+        elif field_name == 'force':
+            if 'speed' in kwargs:
+                speed = kwargs['speed']
+                del kwargs['speed']
             else:
-                E = self.ts.get_field(field=field_name, coord=coord,
-                                          iteration=iteration, theta=T, m=m)[0]
-                field[:,i] = E[Nr:,nz].copy()
-        del E
-
+                speed = None
+            E, info_e = self.__force__(coord, iteration, speed, theta=None, m=m,
+                                       max_resolution_3d=max_resolution_3d, transverse=True)
+        elif field_name == 'envelope': 
+            E, info_e = self.__envelope__(iteration,m,theta=None,env_kw=env_kw,
+                                          max_resolution_3d=max_resolution_3d, transverse=True)
+        else:
+            if coord == 'x' or coord == 'y':
+                Er, info_e = self.ts.data_reader.read_field_circ(field=field_name,coord='r',iteration=iteration,
+                                                                theta=None,m=m,slice_across=None,slice_relative_position=None,
+                                                                max_resolution_3d=max_resolution_3d)
+                Et = self.ts.data_reader.read_field_circ(field=field_name,coord='t',iteration=iteration,
+                                                                theta=None,m=m,slice_across=None,slice_relative_position=None,
+                                                                max_resolution_3d=max_resolution_3d)[0]
+                X,Y,Z = np.meshgrid(info_e.x,info_e.y,info_e.z)
+                T = np.angle(X+1j*Y)
+                if coord == 'x':
+                    E = CartField(Er,Et,T,'x')
+                elif coord == 'y':
+                    E = CartField(Er,Et,T,'y')
+            else:
+                E, info_e = self.ts.data_reader.read_field_circ(field=field_name,coord=coord,iteration=iteration,
+                                                            theta=None,m=m,slice_across=None,slice_relative_position=None,
+                                                            max_resolution_3d=max_resolution_3d)
+        if zpos is None:
+            z_indx = int(.5*len(info_e.z))
+        else:
+            Nz = len(info_e.z)
+            z_indx = Nz+int((zpos-info_e.z(Nz))/info_e.dz)
+            if abs(zpos-info_e.z[z_indx])> abs(zpos-info_e.z[z_indx+1]):
+                z_indx+=1
+        tranE = np.fliplr(E[:,:,z_indx])
+        extent = np.array([info_e.ymax, info_e.ymin, info_e.xmin, info_e.xmax])
+        extent[:2]*=norms[0]
+        extent[2:]*=norms[1]
+        origin='lower'
+        if 'origin' in kwargs:
+            origin = kwargs['origin']
+            del kwargs['origin']
         E0 = 1
         if normalize:
             E0 = self.__normalize__(field_name, coord, A0)
-        field /= E0
-        Theta, R = np.meshgrid(theta,r)
-        X, Y = R*np.cos(Theta), R*np.sin(Theta)
-        X*=norms[0]
-        Y*=norms[1]
-        if swap_axis:
-            plt.pcolormesh(Y,X,field,**kwargs)
-            ax=plt.gca()
-            ax.invert_xaxis()
-        else:
-            plt.pcolormesh(X,Y,field,**kwargs)
-
+        if mask is not None:
+            tranE = np.ma.masked_where(tranE<=mask*E0,tranE)
+        tranE /= E0
+        plt.imshow(tranE, extent=extent, origin=origin, **kwargs)
+        plt.xlabel(f"y {length_um(norms[0])}")
+        plt.ylabel(f"x {length_um(norms[1])}")
+        if output:
+            return tranE, extent
+            
     def bunch_properties_evolution(self, select, property, species=None, trans_space='x',
                                     t_lim=False, output=True, plot=False,
                                     norm_z=1, Norm=1., statistics='rms', **kwargs):
@@ -1854,3 +1938,109 @@ class Diag(object):
                 return Z, a
             if plot:
                 plt.plot(Z*norm_z, a*Norm, **kwargs)
+
+def __transverse_map__(self, field_name, iteration, coord=None,
+            m='all', normalize=False, A0=None,
+            z_pos=None, swap_axis=False, norms=[1.,1.], env_kw=None, **kwargs):
+        """
+        OLD VERSION, TO BE REVIEWED AND PROBABLY DELETED
+        Method to get a 2D-transverse map of passed field_name
+        in x-y  or y-x plane
+
+        **Parameters**
+
+        field_name: string
+            Field to plot
+
+        coord, m: same parameters of .get_field() method.
+            Same defaults (None, 0, 'all')
+
+        iteration: int
+            The same as usual
+
+        normalize: bool, optional;
+            If normalize=True this 'turns on' the normalization.
+            Default is 'False'.
+
+        A0: float, optional;
+            If normalize=True this allows to set the normalizing
+            constant.
+            Default is 'None: in this case normalization is set to
+            usual units, e.g:
+             - e*n_e for charge density 'rho'; this returns normalized
+               density
+             - m_e*c*omega_0/e for transverse 'E'
+             - m_e*c*omega_p/e for longitudinal 'E'
+
+        z_pos: float, optional
+            Choose the actual z-position where to slice the considered field_name;
+            to be set in meters. Default is the first slice.
+
+        swap_axis: bool
+            Whether to plot in x-y or y-x plane with inverted y-axis; default is x-y (False)
+
+        norms: list of floats
+            A list of two float constants to multiply the values
+            of both axis for normalization or magnitude changings; 
+            norms[0] for z-axis, norms[1] for r-axis.
+            Set in meters^-1; default is [1.,1.].
+
+        **kwargs: keywords to pass to .pcolormesh() method
+
+        """
+
+        Nr = self.params['Nr']
+        test_field = self.avail_fields[0]
+        if self.ts.fields_metadata[test_field]['type'] == 'vector':
+            test_coord =  'x'
+        else:
+            test_coord = None
+        info = self.ts.get_field(test_field,test_coord,iteration=iteration)[1]
+        dz = info.dz
+        dr = info.dr
+        if z_pos == None:
+            z_pos=info.zmin
+        if z_pos < info.zmin or z_pos > info.zmax:
+            raise ValueError('Ehi, watch out!\n'
+                              'z_pos = {:f}  cannot be less than {:f}'
+                              'or greater than {:f} meters'.format(z_pos,info.zmin,info.zmax))
+        nz = int((z_pos-info.zmin)/dz+0.5)
+        theta = np.linspace(0,2*pi*(1+1/Nr),Nr+1)
+        r = np.insert(info.r[Nr:],0,0.)
+        field = np.zeros([Nr,Nr])
+
+        for i,T in enumerate(theta[:-1]):
+            if field_name == 'phi':
+                E = self.__potential__(iteration, theta=T, m=m)[0]
+                field[:,i] = E[Nr:,nz].copy()
+            elif field_name == 'force':
+                if 'speed' in kwargs:
+                    speed = kwargs['speed']
+                    del kwargs['speed']
+                else:
+                    speed = None 
+                E = self.__force__(coord, iteration, speed, theta=T, m=m)[0]
+                field[:,i] = E[Nr:,nz].copy()
+            elif field_name == 'envelope':
+                E = self.__envelope__(iteration,m,theta,env_kw)[0]
+                field[:,i] = E[Nr:,nz].copy()
+            else:
+                E = self.ts.get_field(field=field_name, coord=coord,
+                                          iteration=iteration, theta=T, m=m)[0]
+                field[:,i] = E[Nr:,nz].copy()
+        del E
+
+        E0 = 1
+        if normalize:
+            E0 = self.__normalize__(field_name, coord, A0)
+        field /= E0
+        Theta, R = np.meshgrid(theta,r)
+        X, Y = R*np.cos(Theta), R*np.sin(Theta)
+        X*=norms[0]
+        Y*=norms[1]
+        if swap_axis:
+            plt.pcolormesh(Y,X,field,**kwargs)
+            ax=plt.gca()
+            ax.invert_xaxis()
+        else:
+            plt.pcolormesh(X,Y,field,**kwargs)
