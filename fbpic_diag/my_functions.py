@@ -57,7 +57,7 @@ class Diag(object):
                 N = m_e*omega0*c/e
         return N
 
-    def __potential__(self, iteration, theta, m, max_resolution_3d,transverse=False):
+    def __potential__(self, iteration, theta, m, transverse=False, max_resolution_3d=[1000,500]):
         """
         Method to integrate electrostatic potential from longitudinal field Ez.
 
@@ -91,7 +91,7 @@ class Diag(object):
                 phi[:,i] = np.trapz(Ez[:, i:i+2], dx=info_e.dz) + phi[:, i+1]
         return phi, info_e
 
-    def __force__(self, coord, iteration, speed, theta, m, max_resolution_3d,transverse=False):
+    def __force__(self, coord, iteration, speed, theta, m, transverse=False, max_resolution_3d=[1000,500]):
         """
         Method to calculate transverse components of force .
 
@@ -172,7 +172,7 @@ class Diag(object):
                                  "\t\a 'x', 'y', 'r' or 't' direction for 'coord'")
         return F, info
 
-    def __envelope__(self, iteration, m, theta, env_kw,max_resolution_3d,transverse=False):
+    def __envelope__(self, iteration, m, theta, env_kw, transverse=False, max_resolution_3d=[1000,500]):
         if transverse:
             Er, info = self.ts.data_reader.read_field_circ(field='E', coord='r', iteration=iteration, m=m, theta=None,
                                                             slice_across=None, slice_relative_position=None,
@@ -299,11 +299,27 @@ class Diag(object):
         return P
 
     def __gamma___(self,species=None,t=None,iteration=None,select=None):
-        ux,uy,uz = self.ts.get_particle(['ux','uy','uz'], species,
+        ux,uy,uz = self.select_particles(['ux','uy','uz'], species,
                                         t,iteration,select)
         gamma = np.sqrt(1+ux**2+uy**2+uz**2)
         return gamma
-
+    
+    def select_particles(self,var_list,select,species=None,iteration=None,t=None):
+        if 'gamma' in var_list and 'gamma' not in self.avail_record_components:
+            gamma_indx = var_list.index('gamma')
+            var_list.remove('gamma')
+            gamma = self.__gamma___(species,t,iteration,select)
+        if select is None or isinstance(select,ParticleTracker):
+            ptcl = self.ts.get_particle(var_list,t=t,iteration=iteration,
+                                        select=select,species=species)                        
+        elif 'div' in select:
+            ptcl = self.__select_by_div__(var_list,t=t,iteration=iteration,
+                                          select=select,species=species)                        
+        else:    
+            ptcl = self.ts.get_particle(var_list,t=t,iteration=iteration,
+                                        select=select,species=species)
+        return ptcl
+    
     def slice_emit(self, N, select=None, species=None, iteration=None,
                     plot=False, components=['x','ux'], mask=0., trans_space='x',
                     z0=0., norms=[1.,1.], **kwargs):
@@ -699,7 +715,10 @@ class Diag(object):
                     continue
                 if prop == 'mean_energy':
                     if selection is not None and 'div' in selection:
-                        gamma = self.__select_by_div__(['gamma'], species=species, select=selection, iteration=t)[0]
+                        if 'gamma' in self.avail_record_components:
+                            gamma = self.__select_by_div__(['gamma'], species=species, select=selection, iteration=t)[0]
+                        else:
+                            pass
                     else:                        
                         gamma = self.ts.get_particle(['gamma'], species=species, select=selection, iteration=t)[0]
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
@@ -778,7 +797,7 @@ class Diag(object):
     def lineout(self, field_name,coord=None,
                 iteration=0, theta=0, m='all',
                 normalize=False, A0=None, slicing='z',
-                on_axis=None, z0=0., norm_z=1., output=False, env_kw=None,**kwargs):
+                on_axis=None, z0=0., norm_z=1., output=False, env_kw=dict(),**kwargs):
         """
         Method to get a lineout plot of passed field_name
 
@@ -874,7 +893,7 @@ class Diag(object):
 
     def map(self, field_name,coord=None,
             iteration=0, theta=0, m='all', normalize=False, A0=None, 
-            z0=0., norms=[1.,1.], output=False, mask=None,env_kw=None, **kwargs):
+            z0=0., norms=[1.,1.], output=False, mask=None,env_kw=dict(), **kwargs):
         """
         Method to get a 2D-map of passed field_name
 
