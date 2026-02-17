@@ -195,6 +195,10 @@ class Diag(object):
             print("You must specify the 'mode' key in 'env_kw' dictionary to choose a calculation; choose one among 'x', 'y' or 'both'.",
                   "\nDefault has been set to 'both'.")
             mode = 'both'
+        if 'N' not in env_kw:
+            env_kw['N'] = None
+        if 'axis' not in env_kw:
+            env_kw['axis'] = -1
         match mode:
             case 'x':
                 Ex = CartField(Er, Et, T, coord='x')
