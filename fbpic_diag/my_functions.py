@@ -316,7 +316,7 @@ class Diag(object):
         else:    
             ptcl = self.ts.get_particle(var_list,t=t,iteration=iteration,
                                         select=select,species=species)
-        if 'gamma' in var_list and 'gamma' not in self.avail_record_components[species]:
+        if 'gamma' not in self.avail_record_components[species]:
             ptcl.insert(gamma_indx,gamma)
         return ptcl
     
