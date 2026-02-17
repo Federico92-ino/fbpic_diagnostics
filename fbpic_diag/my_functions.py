@@ -297,12 +297,6 @@ class Diag(object):
                 u = epsilon_0/2*(mod2E+c**2*mod2B)
                 P[k] = 2*pi*np.trapz(np.trapz(u[Nr:,:],dx=info.dz,axis=1)*info.r[Nr:],dx=info.dr)
         return P
-
-    def __gamma___(self,species=None,t=None,iteration=None,select=None):
-        ux,uy,uz = self.select_particles(['ux','uy','uz'],select, species,
-                                        iteration,t)
-        gamma = np.sqrt(1+ux**2+uy**2+uz**2)
-        return gamma
     
     def select_particles(self,var_list,select,species,iteration=None,t=None):
         if species is None:
@@ -310,6 +304,9 @@ class Diag(object):
         if 'gamma' in var_list and 'gamma' not in self.avail_record_components[species]:
             gamma_indx = var_list.index('gamma')
             var_list.remove('gamma')
+            ux,uy,uz = self.select_particles(['ux','uy','uz'],select, species,
+                                        iteration,t)
+            gamma = np.sqrt(1+ux**2+uy**2+uz**2)
         if select is None or isinstance(select,ParticleTracker):
             ptcl = self.ts.get_particle(var_list,t=t,iteration=iteration,
                                         select=select,species=species)                        
@@ -320,7 +317,6 @@ class Diag(object):
             ptcl = self.ts.get_particle(var_list,t=t,iteration=iteration,
                                         select=select,species=species)
         if 'gamma' in var_list and 'gamma' not in self.avail_record_components[species]:
-            gamma = self.__gamma___(species,t,iteration,select)
             ptcl.insert(gamma_indx,gamma)
         return ptcl
     
