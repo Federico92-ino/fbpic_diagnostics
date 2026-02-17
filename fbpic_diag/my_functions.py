@@ -777,7 +777,7 @@ class Diag(object):
         if plot:
             plt.plot(z*norm_z, E/E0, **kwargs)
         if output:
-            return z*norm_z, E/E0
+            return  E/E0, z*norm_z, info_e
 
     def map(self, field_name,coord=None,
             iteration=0, theta=0, m='all', normalize=False, A0=None, 
@@ -868,7 +868,7 @@ class Diag(object):
         else:
             plt.ylabel(f"r {length_um(norms[1])}")
         if output:
-            return E, extent
+            return E, extent, info_e
 
     def transverse_map(self, field_name, coord=None, m='all',
                         iteration=0,zpos=None,max_resolution_3d=[1000,500],
@@ -981,7 +981,7 @@ class Diag(object):
         plt.xlabel(f"y {length_um(norms[0])}")
         plt.ylabel(f"x {length_um(norms[1])}")
         if output:
-            return tranE, extent
+            return tranE, extent, info_e
             
     def bunch_properties_evolution(self, select, property, species=None, trans_space='x',
                                     t_lim=False, output=True, plot=False,
