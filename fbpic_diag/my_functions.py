@@ -842,6 +842,8 @@ class Diag(object):
             if on_axis is None:
                 on_axis = 0.
             N = self.params['Nr'] + int(on_axis/info_e.dr)
+            if abs(on_axis-info_e.r[N])> abs(on_axis-info_e.r[N+1]):
+                N+=1
             E = E[N, :]
             z = info_e.z
             if z0:
@@ -850,6 +852,8 @@ class Diag(object):
             if on_axis is None:
                 on_axis = info_e.z[int(self.params['Nz']/2)]
             N = int(self.params['Nz']/2) + int((on_axis-info_e.z[int(self.params['Nz']/2)])/info_e.dz)
+            if abs(on_axis-info_e.z[N])> abs(on_axis-info_e.z[N+1]):
+                N+=1
             E = E[:, N]
             z = info_e.r
         else:
@@ -1045,7 +1049,7 @@ class Diag(object):
             z_indx = int(.5*len(info_e.z))
         else:
             Nz = len(info_e.z)
-            z_indx = Nz+int((zpos-info_e.z[Nz])/info_e.dz)
+            z_indx = int(.5*Nz)+int((zpos-info_e.z[int(.5*Nz)])/info_e.dz)
             if abs(zpos-info_e.z[z_indx])> abs(zpos-info_e.z[z_indx+1]):
                 z_indx+=1
         tranE = np.fliplr(E[:,:,z_indx])
