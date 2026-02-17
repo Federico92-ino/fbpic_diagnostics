@@ -685,7 +685,8 @@ class Diag(object):
     def lineout(self, field_name,coord=None,
                 iteration=0, theta=0, m='all',
                 normalize=False, A0=None, slicing='z',
-                on_axis=None, z0=0., norm_z=1., output=False, env_kw=dict(),**kwargs):
+                on_axis=None, z0=0., norm_z=1., plot=True,
+                output=False, env_kw=dict(),**kwargs):
         """
         Method to get a lineout plot of passed field_name
 
@@ -773,9 +774,8 @@ class Diag(object):
         E0 = 1
         if normalize:
             E0 = self.__normalize__(field_name, coord, A0)
-
-        plt.plot(z*norm_z, E/E0, **kwargs)
-
+        if plot:
+            plt.plot(z*norm_z, E/E0, **kwargs)
         if output:
             return z*norm_z, E/E0
 
