@@ -781,7 +781,7 @@ class Diag(object):
 
     def map(self, field_name,coord=None,
             iteration=0, theta=0, m='all', normalize=False, A0=None, 
-            z0=0., norms=[1.,1.], output=False, mask=None,env_kw=dict(), **kwargs):
+            z0=0., norms=[1.,1.], plot=True, output=False, mask=None,env_kw=dict(), **kwargs):
         """
         Method to get a 2D-map of passed field_name
 
@@ -858,21 +858,22 @@ class Diag(object):
         if mask is not None:
             E = np.ma.masked_where(E<=mask*E0,E)
         E /= E0
-        plt.imshow(E, extent=extent,
-                  origin=origin, **kwargs)
-        plt.xlabel(f"z {length_um(norms[0])}")
-        if theta == 0:
-            plt.ylabel(f"x {length_um(norms[1])}")
-        elif theta == pi/2:
-            plt.ylabel(f"y {length_um(norms[1])}")
-        else:
-            plt.ylabel(f"r {length_um(norms[1])}")
+        if plot:
+            plt.imshow(E, extent=extent,
+                      origin=origin, **kwargs)
+            plt.xlabel(f"z {length_um(norms[0])}")
+            if theta == 0:
+                plt.ylabel(f"x {length_um(norms[1])}")
+            elif theta == pi/2:
+                plt.ylabel(f"y {length_um(norms[1])}")
+            else:
+                plt.ylabel(f"r {length_um(norms[1])}")
         if output:
             return E, extent, info_e
 
     def transverse_map(self, field_name, coord=None, m='all',
                         iteration=0,zpos=None,max_resolution_3d=[1000,500],
-                        normalize=False, A0=None, norms=[1.,1.], output=False, mask=None, env_kw=dict(), **kwargs):
+                        normalize=False, A0=None, norms=[1.,1.], plot=True, output=False, mask=None, env_kw=dict(), **kwargs):
         """
         Method to get a 2D-transverse map of passed field_name in the plane y-x;
         y-axis (horizontal) ois in decreasing order, x-axis (vertical) is in increasing order.
@@ -977,9 +978,10 @@ class Diag(object):
         if mask is not None:
             tranE = np.ma.masked_where(tranE<=mask*E0,tranE)
         tranE /= E0
-        plt.imshow(tranE, extent=extent, origin=origin, **kwargs)
-        plt.xlabel(f"y {length_um(norms[0])}")
-        plt.ylabel(f"x {length_um(norms[1])}")
+        if plot:
+            plt.imshow(tranE, extent=extent, origin=origin, **kwargs)
+            plt.xlabel(f"y {length_um(norms[0])}")
+            plt.ylabel(f"x {length_um(norms[1])}")
         if output:
             return tranE, extent, info_e
             
@@ -1665,109 +1667,3 @@ class Diag(object):
                 return Z, a
             if plot:
                 plt.plot(Z*norm_z, a*Norm, **kwargs)
-
-def __transverse_map__(self, field_name, iteration, coord=None,
-            m='all', normalize=False, A0=None,
-            z_pos=None, swap_axis=False, norms=[1.,1.], env_kw=None, **kwargs):
-        """
-        OLD VERSION, TO BE REVIEWED AND PROBABLY DELETED
-        Method to get a 2D-transverse map of passed field_name
-        in x-y  or y-x plane
-
-        **Parameters**
-
-        field_name: string
-            Field to plot
-
-        coord, m: same parameters of .get_field() method.
-            Same defaults (None, 0, 'all')
-
-        iteration: int
-            The same as usual
-
-        normalize: bool, optional;
-            If normalize=True this 'turns on' the normalization.
-            Default is 'False'.
-
-        A0: float, optional;
-            If normalize=True this allows to set the normalizing
-            constant.
-            Default is 'None: in this case normalization is set to
-            usual units, e.g:
-             - e*n_e for charge density 'rho'; this returns normalized
-               density
-             - m_e*c*omega_0/e for transverse 'E'
-             - m_e*c*omega_p/e for longitudinal 'E'
-
-        z_pos: float, optional
-            Choose the actual z-position where to slice the considered field_name;
-            to be set in meters. Default is the first slice.
-
-        swap_axis: bool
-            Whether to plot in x-y or y-x plane with inverted y-axis; default is x-y (False)
-
-        norms: list of floats
-            A list of two float constants to multiply the values
-            of both axis for normalization or magnitude changings; 
-            norms[0] for z-axis, norms[1] for r-axis.
-            Set in meters^-1; default is [1.,1.].
-
-        **kwargs: keywords to pass to .pcolormesh() method
-
-        """
-
-        Nr = self.params['Nr']
-        test_field = self.avail_fields[0]
-        if self.ts.fields_metadata[test_field]['type'] == 'vector':
-            test_coord =  'x'
-        else:
-            test_coord = None
-        info = self.ts.get_field(test_field,test_coord,iteration=iteration)[1]
-        dz = info.dz
-        dr = info.dr
-        if z_pos == None:
-            z_pos=info.zmin
-        if z_pos < info.zmin or z_pos > info.zmax:
-            raise ValueError('Ehi, watch out!\n'
-                              'z_pos = {:f}  cannot be less than {:f}'
-                              'or greater than {:f} meters'.format(z_pos,info.zmin,info.zmax))
-        nz = int((z_pos-info.zmin)/dz+0.5)
-        theta = np.linspace(0,2*pi*(1+1/Nr),Nr+1)
-        r = np.insert(info.r[Nr:],0,0.)
-        field = np.zeros([Nr,Nr])
-
-        for i,T in enumerate(theta[:-1]):
-            if field_name == 'phi':
-                E = self.__potential__(iteration, theta=T, m=m)[0]
-                field[:,i] = E[Nr:,nz].copy()
-            elif field_name == 'force':
-                if 'speed' in kwargs:
-                    speed = kwargs['speed']
-                    del kwargs['speed']
-                else:
-                    speed = None 
-                E = self.__force__(coord, iteration, speed, theta=T, m=m)[0]
-                field[:,i] = E[Nr:,nz].copy()
-            elif field_name == 'envelope':
-                E = self.__envelope__(iteration,m,theta,env_kw)[0]
-                field[:,i] = E[Nr:,nz].copy()
-            else:
-                E = self.ts.get_field(field=field_name, coord=coord,
-                                          iteration=iteration, theta=T, m=m)[0]
-                field[:,i] = E[Nr:,nz].copy()
-        del E
-
-        E0 = 1
-        if normalize:
-            E0 = self.__normalize__(field_name, coord, A0)
-        field /= E0
-        Theta, R = np.meshgrid(theta,r)
-        X, Y = R*np.cos(Theta), R*np.sin(Theta)
-        X*=norms[0]
-        Y*=norms[1]
-        if swap_axis:
-            plt.pcolormesh(Y,X,field,**kwargs)
-            ax=plt.gca()
-            ax.invert_xaxis()
-        else:
-            plt.pcolormesh(X,Y,field,**kwargs)
