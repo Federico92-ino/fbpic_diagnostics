@@ -271,10 +271,10 @@ class Diag(object):
                         r = info.r[Mask.mask]
                         P[k] = r.max()
                     elif method=='rms':
-                        P[k] = np.sqrt(2)*central_average(info.r,field,'rms')
+                        P[k] = np.sqrt(2)*dev(info.r,field,'rms')
                     elif method=='fit':
                         r_mean=mean(info.r,field)
-                        r_std=central_average(info.r,field,'rms')
+                        r_std=dev(info.r,field,'rms')
                         params,_ = curve_fit(gauss_fit,info.r,field,[a0,r_mean,r_std],**curve_fit_kw)
                         P[k] = params[2]
                     else:
@@ -412,8 +412,8 @@ class Diag(object):
             Z[n] = mean(z[inds], w[inds])
 
             s_emit[n] = emittance(x[inds], ux[inds], w[inds])
-            s_sigma_x[n] = central_average(x[inds], w[inds])
-            s_sigma_ux[n] = central_average(ux[inds], w[inds])
+            s_sigma_x[n] = dev(x[inds], w[inds])
+            s_sigma_ux[n] = dev(ux[inds], w[inds])
 
         S_prop = {'s_emit': s_emit, 's_sigma_x': s_sigma_x,
                   's_sigma_ux': s_sigma_ux, 'z': Z}
@@ -485,8 +485,8 @@ class Diag(object):
             comp2 = comp2[a]
             weight = weight[a]
             for n in range(-1, 2):
-                inds = np.where((z >= mean(z,w)+n*central_average(z,w)-dz/2) &
-                                (z <= mean(z,w)+n*central_average(z,w)+dz/2))
+                inds = np.where((z >= mean(z,w)+n*dev(z,w)-dz/2) &
+                                (z <= mean(z,w)+n*dev(z,w)+dz/2))
                 X = comp1[inds]
                 UX = comp2[inds]
                 weight = w[inds]
@@ -578,7 +578,7 @@ class Diag(object):
         for i,t in enumerate(self.iterations):
             z, w = self.select_particles(['z','w'], select=select, iteration=t, species=species)
             z_mean = mean(z,w)
-            sigma_z = central_average(z,w)
+            sigma_z = dev(z,w)
             for j,n in enumerate(n_slice):
                 if select is None:
                     selection = {'z':[z_mean+n*sigma_z-dz/2,z_mean+n*sigma_z+dz/2]}
@@ -589,14 +589,14 @@ class Diag(object):
                     x = self.select_particles([A], species=species, select=selection, iteration=t)[0]
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
-                    a[j,i] = central_average(x,W)
+                    a[j,i] = dev(x,W)
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'momenta_spread':
                     x = self.select_particles([B], species=species, select=selection, iteration=t)[0]
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
-                    a[j,i] = central_average(x,W)
+                    a[j,i] = dev(x,W)
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'divergence':
@@ -604,7 +604,7 @@ class Diag(object):
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     slope = divergence(px=ux,pz=uz)
-                    a[j,i] = central_average(slope,W)
+                    a[j,i] = dev(slope,W)
                     Z[j,i] = z_mean+n*sigma_z
                     continue
                 if prop == 'solid_div':
@@ -612,7 +612,7 @@ class Diag(object):
                     inds = np.where((z>=z_mean+n*sigma_z-dz/2) & (z<=z_mean+n*sigma_z+dz/2))[0]
                     W = w[inds]
                     slope = divergence(px=ux,py=uy,pz=uz)
-                    a[j,i] = central_average(slope,W)
+                    a[j,i] = dev(slope,W)
                     Z[j,i] = z_mean+n*sigma_z                
                     continue
                 if prop == 'ph_emit_n':
@@ -1047,8 +1047,8 @@ class Diag(object):
         Norm: float
             Multiplying constant to set properties normalization.
 
-        energy_calc_type: str
-            How to calculate mean energy and/or energy spread. Choose between
+        statistics: str
+            How to calculate property. Choose between
             'rms' or 'mad'. Default 'rms'    
 
         **kwargs: keyword to pass to .pyplot.plot()
@@ -1096,24 +1096,24 @@ class Diag(object):
                     continue
                 elif property == 'beam_size':
                     x, z, w = self.select_particles([A,'z','w'], t=i, select=select, species=species)
-                    a[k] = central_average(x, w, statistics)
+                    a[k] = dev(x, w, statistics)
                     Z[k] = Mean(z,w)
                     continue
                 elif property == 'momenta_spread':
                     ux, z, w = self.select_particles([B,'z','w'], t=i, select=select, species=species)
-                    a[k] = central_average(ux, w, statistics)
+                    a[k] = dev(ux, w, statistics)
                     Z[k] = Mean(z,w)
                     continue
                 elif property == 'divergence':
                     ux, uz, z, w = self.select_particles([B,'uz','z','w'], t=i, select=select, species=species)
                     slope = divergence(px=ux,pz=uz)
-                    a[k] = central_average(slope,w,statistics)
+                    a[k] = dev(slope,w,statistics)
                     Z[k] = Mean(z,w)
                     continue
                 elif property == 'solid_div':
                     ux, uy, uz, z, w = self.select_particles(['ux','uy','uz','z','w'], t=i, select=select, species=species)
                     solid = divergence(ux,uy,uz)
-                    a[k] = central_average(solid,w,statistics)
+                    a[k] = dev(solid,w,statistics)
                     Z[k] = Mean(z,w)
                     continue
                 elif property == 'charge':
@@ -1575,7 +1575,7 @@ class Diag(object):
                         l = np.append(l,x)
                         m = np.append(m,z)
                         n = np.append(n,w)
-                    a[k] = central_average(l,n,statistics)
+                    a[k] = dev(l,n,statistics)
                     Z[k] = Mean(m,n)
                     continue
                 elif property == 'momenta_spread':
@@ -1584,7 +1584,7 @@ class Diag(object):
                         l = np.append(l,ux)
                         m = np.append(m,z)
                         n = np.append(n,w)
-                    a[k] = central_average(l,n,statistics)
+                    a[k] = dev(l,n,statistics)
                     Z[k] = Mean(m,n)
                     continue
                 elif property == 'divergence':
@@ -1595,7 +1595,7 @@ class Diag(object):
                         n = np.append(n,z)
                         o = np.append(o,w)
                     slope = divergence(px=l,pz=m)
-                    a[k] = central_average(slope,o,statistics)
+                    a[k] = dev(slope,o,statistics)
                     Z[k] = Mean(n,o)
                     continue
                 elif property == 'solid_div':
@@ -1607,7 +1607,7 @@ class Diag(object):
                         o = np.append(o,z)
                         p = np.append(p,w)
                     solid = divergence(l,m,n)
-                    a[k] = central_average(solid,p,statistics)
+                    a[k] = dev(solid,p,statistics)
                     Z[k] = Mean(o,p)
                     continue
                 elif property == 'charge':

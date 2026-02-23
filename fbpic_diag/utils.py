@@ -72,7 +72,7 @@ def weighted_median(x,w=None):
     else:
         return np.nan
     
-def central_average(x, w, kind):
+def dev(x, w, kind):
 
     """
     Function to calculate the second order momentum of quantity x
@@ -86,11 +86,11 @@ def central_average(x, w, kind):
     match kind:
         case 'rms':
             x_mean = mean(x,w)
-            average = np.sqrt(mean((x-x_mean)**2, w))
+            deviation = np.sqrt(mean((x-x_mean)**2, w))
         case 'mad':
             x_mean = weighted_median(x,w)
-            average = weighted_median(abs(x-x_mean),w)*1.4826
-    return average
+            deviation = weighted_median(abs(x-x_mean),w)*1.4826
+    return deviation
 
 def covar(x, ux, w, kind):
 
@@ -108,9 +108,13 @@ def covar(x, ux, w, kind):
             ux_mean = mean(ux, w)
             covariance = mean((x-x_mean)*(ux-ux_mean), w)
         case 'mad':
-            x_mean = weighted_median(x,w)
-            ux_mean = weighted_median(ux,w)
-            covariance = weighted_median((x-x_mean)*(ux-ux_mean),w)    
+            dev_x,dev_ux = [dev(v,w,'mad') for v in [x,ux]]
+            z_x = x/dev_x
+            z_ux = ux/dev_ux
+            dev_p = dev((z_x+z_ux),w,'mad')
+            dev_m = dev((z_x-z_ux),w,'mad')
+            cor = (dev_p**2-dev_m**2)/(dev_p**2+dev_m**2)
+            covariance = cor*dev_x*dev_ux
     return covariance
 
 def emittance(x, ux, w,kind):
@@ -123,8 +127,8 @@ def emittance(x, ux, w,kind):
     **Returns**
     emittance: float
     """
-    sigma_x = central_average(x, w, kind)
-    sigma_ux = central_average(ux, w, kind)
+    sigma_x = dev(x, w, kind)
+    sigma_ux = dev(ux, w, kind)
     covariance = covar(x, ux, w, kind)
 
     emit = np.sqrt(sigma_x**2*sigma_ux**2-covariance**2)
@@ -157,10 +161,10 @@ def twiss(x, px, pz, w, type, kind):
         covariance = covar(x, slope, w, kind)
         tw = covariance*(-inv_emit)
     elif type == 'beta':
-        sigma_x = central_average(x, w, kind)
+        sigma_x = dev(x, w, kind)
         tw = sigma_x**2*inv_emit
     elif type == 'gamma':
-        sigma_slope = central_average(slope, w, kind)
+        sigma_slope = dev(slope, w, kind)
         tw = sigma_slope**2*inv_emit
 
     return tw
@@ -180,8 +184,8 @@ def energy_spread(gamma, w, kind):
             Mean = mean(gamma,w)
         case 'mad':
             Mean = weighted_median(gamma, w)
-    dev = central_average(gamma, w, kind)
-    sigma = dev/Mean
+    deviation = dev(gamma, w, kind)
+    sigma = deviation/Mean
     return sigma
 
 def if_not_div(components):
