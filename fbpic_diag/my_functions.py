@@ -191,6 +191,7 @@ class Diag(object):
             T = np.angle(R)+theta
         try:
             mode = env_kw['mode']
+            del env_kw['mode']
         except:
             print("You must specify the 'mode' key in 'env_kw' dictionary to choose a calculation; choose one among 'x', 'y' or 'both'.",
                   "\nDefault has been set to 'both'.")
