@@ -298,8 +298,57 @@ class Diag(object):
                 u = epsilon_0/2*(mod2E+c**2*mod2B)
                 P[k] = 2*pi*np.trapz(np.trapz(u[Nr:,:],dx=info.dz,axis=1)*info.r[Nr:],dx=info.dr)
         return P
+
+    def __in_records__(self,components,species):
+        Bool = all([comp in self.avail_record_components[species] if comp != 'gamma' else True for comp in components])
+        return Bool
+
+    def __one_in_records__(self,components,species):
+        Bool = any([comp in self.avail_record_components[species] if comp != 'gamma' else True for comp in components])
+        return Bool
     
-    def select_particles(self,var_list,select,species,iteration=None,t=None):
+    def __not_in_records__(self,comp,iteration,select,species):
+        if 'div' in comp:
+           which = comp.split('_')[-1]
+           match which:
+                case 'x':
+                    px, pz = \
+                            self.select_particles(['ux', 'uz'],iteration=iteration,
+                                                  select=select,species=species)
+                    return divergence(px=px, pz=pz)
+                case 'y':
+                    py, pz = \
+                            self.select_particles(['uy', 'uz'],iteration=iteration,
+                                                    select=select,species=species)
+                    return divergence(px=py, pz=pz)
+                case '2':
+                    px, py, pz = \
+                            self.select_particles(['ux', 'uy', 'uz'],iteration=iteration,
+                                                    select=select,species=species)
+                    return divergence(px=px, py=py, pz=pz)
+                case _:
+                    raise ValueError("Unrecognised divergence component; choose one among 'div_x', 'div_y' or 'div_2'")
+        elif 'beta' in comp:
+            which = comp.split('_')[-1]
+            match which:
+                case 'x':
+                    px, gamma = self.select_particles(['ux', 'gamma'],iteration=iteration,
+                                                        select=select,species=species)
+                    return px/gamma
+                case 'y':
+                    py, gamma = self.select_particles(['uy', 'gamma'],iteration=iteration,
+                                                        select=select,species=species)
+                    return py/gamma
+                case 'z':
+                    pz, gamma = self.select_particles(['uz', 'gamma'],iteration=iteration,
+                                                        select=select,species=species)
+                    return pz/gamma
+                case _:
+                    raise ValueError("Unrecognised beta component; choose one among 'beta_x', 'beta_y' or 'beta_z'")
+        else:
+            raise ValueError("Unrecognised component; only 'div' and 'beta' components can be calculated if not in records")
+        
+    def select_particles(self,var_list,select=None,species=None,iteration=None,t=None):
         if species is None:
             species = self.avail_species[0]
         var_list_copy = var_list.copy()
@@ -1233,23 +1282,7 @@ class Diag(object):
                 inv_dz = bins/(z.max()-z.min())
                 values = np.abs(pre_values*inv_dz)
             inv_norm_z = 1.
-        elif 'div' in component:
-            if '2' in component:
-                ux, uy, uz, q, w = self.select_particles(['ux','uy','uz','charge','w'],
-                                                        iteration=iteration, species=species,select=select)
-                comp = divergence(ux,uy,uz)
-            elif 'x' in component or 'y' in component:
-                coord = component.split('_')[1]
-                ux, uz, q, w = self.select_particles(['u'+coord,'uz','charge','w'],
-                                                    iteration=iteration, species=species,select=select)
-                comp = divergence(px=ux,pz=uz)
-            if not charge:
-                q = 1.
-            pre_values, Bin = np.histogram(comp, bins=bins, weights=q*w*ipp)
-            inv_dz = bins/(comp.max()-comp.min())
-            values = np.abs(pre_values*inv_dz)
-            inv_norm_z = 1/norm_z
-        else:
+        elif self.__in_records__([component],species):
             comp, q, w = self.select_particles([component, 'charge', 'w'],
                                                 iteration=iteration, species=species, select=select)
             if not charge:
@@ -1258,10 +1291,22 @@ class Diag(object):
             inv_dz = bins/(comp.max()-comp.min())
             values = np.abs(pre_values*inv_dz)
             inv_norm_z = 1/norm_z
-        
+        else:
+            comp = self.__not_in_records__(component, iteration=iteration,
+                                           species=species, select=select)
+            q, w = self.select_particles(['charge','w'], iteration=iteration,
+                                         species=species, select=select)
+            if not charge:
+                q = 1.
+            pre_values, Bin = np.histogram(comp, bins=bins, weights=q*w*ipp)
+            inv_dz = bins/(comp.max()-comp.min())
+            values = np.abs(pre_values*inv_dz)
+            inv_norm_z = 1/norm_z
+
         if plot:
             _, _, _ = plt.hist(Bin[:-1]*norm_z, Bin*norm_z, weights=values*inv_norm_z, **kwargs)
             del _
+            plt.xlabel(f"{coord_label(component,norm_z)}")
 
         if output:
             return values, Bin
@@ -1354,11 +1399,10 @@ class Diag(object):
             q = 1
 
         comp = [None,None]
-
         if len(components) > 2:
             raise ValueError("List of components must be of length 2!")
 
-        if if_not_div(components):
+        if self.__in_records__(components,species):
             compx, compy, weight = \
                     self.select_particles([components[0], components[1],'w'],
                                          iteration=iteration, select=select,
@@ -1366,34 +1410,15 @@ class Diag(object):
             comp[0] = compx
             comp[1] = compy
         else:
-            dictio = which_div(components,where_div(components))
-            key = list(dictio.keys())
-            values = list(dictio.values())
-            if len(dictio) > 1:
-                px, py, pz, weight = \
-                        self.select_particles(['ux', 'uy', 'uz', 'w'],iteration=iteration,
-                                              select=select,species=species)
-                for j,i in enumerate(values):
-                    if i == '2':
-                        compx = divergence(px,py,pz)
-                    elif i == 'x':
-                        compx = divergence(px=px,pz=pz)
-                    else:
-                        compx = divergence(px=py,pz=pz)
-                    comp[j] = compx
-            else:
-                if '2' not in values:
-                    px, pz, compx, weight = \
-                            self.select_particles(['u'+values[0], 'uz',components[key[0]-1],'w'],iteration=iteration,
-                                                  select=select,species=species)
-                    comp[key[0]] = divergence(px=px,pz=pz)
-                    comp[key[0]-1] = compx
+            for i, com in enumerate(components):
+                if com in self.avail_record_components[species]:
+                    comp[i],weight = self.select_particles([com,'w'], iteration=iteration,
+                                                            select=select, species=species)
                 else:
-                    px, py, pz, compx, weight = \
-                            self.select_particles(['ux', 'uy', 'uz',components[key[0]-1],'w'],iteration=iteration,
-                                                  select=select,species=species)
-                    comp[key[0]] = divergence(px,py,pz)
-                    comp[key[0]-1] = compx
+                    comp[i] = self.__not_in_records__(com,iteration=iteration,
+                                             select=select, species=species)
+            if 'weight' not in locals():
+                weight, = self.select_particles(['w'], iteration=iteration, select=select, species=species)
 
         if 'z' in components and z0:
             if components.index('z') == 0:
@@ -1414,10 +1439,12 @@ class Diag(object):
 
         if plot:
             plt.pcolormesh(xedge, yedge, H, cmap=cmap, alpha=alpha,**kwargs)
+            plt.xlabel(f"{coord_label(components[0],norms[0])}")
+            plt.ylabel(f"{coord_label(components[1],norms[1])}")
         if output:
             return xedge, yedge, H
     
-    def  laser_params_evolution(self,params:str|list|tuple, it_window=None, method='exp',**curve_fit_kw):
+    def laser_params_evolution(self,params:str|list|tuple, it_window=None, method='exp',**curve_fit_kw):
         """
         Method to calculate peak amplitude, waist and EM energy evolution during laser propagation.
         For waist calculation three methods are available:

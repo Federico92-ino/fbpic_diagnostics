@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.constants import pi
+from scipy.constants import pi, m_e, c, e
 import sys
 def divergence(px=None, py=None, pz=None):
 
@@ -188,27 +188,6 @@ def energy_spread(gamma, w, kind):
     sigma = deviation/Mean
     return sigma
 
-def if_not_div(components):
-    if 'div_' in components[0] or 'div_' in components[1]:
-        return False
-    else:
-        return True
-def where_div(components):
-    if 'div_' in components[0] and 'div_' not in components[1]:
-        return 0
-    elif 'div_' in components[1] and 'div_' not in components[0]:
-        return 1
-    else:
-        return 'both'
-def which_div(components,where):
-    dictio=dict()
-    if where == 'both':
-        for i,div in enumerate(components):
-            dictio[i] = div.split('_')[1]
-    else:
-        dictio[where] = components[where].split('_')[1]
-    return dictio
-
 def CartField(Fr,Ft,theta,coord):
     if coord == 'x':
         F = Fr*np.cos(theta)-Ft*np.sin(theta)
@@ -225,8 +204,50 @@ def length_um(factor=1):
         case 1e3:
             return '[mm]'
         case 1e6:
-            return '[$\mu$m]'
+            return r'[$\mu$m]'
         case 1e9:
             return '[nm]'
         case _:
             return ''
+def coord_label(coord,norm):
+    if coord in ['x','y','z','ux','uy','uz','gamma']:
+        match coord:
+            case 'x':
+                return 'x '+length_um(norm)
+            case 'y':
+                return 'y '+length_um(norm)
+            case 'z':
+                return 'z '+length_um(norm)
+            case 'ux':
+                return r'$u_x$ [$m_e c$]'
+            case 'uy':
+                return r'$u_y$ [$m_e c$]'
+            case 'uz':
+                return r'$u_z$ [$m_e c$]'
+            case 'gamma':
+                if norm == m_e*c**2/e:
+                    return r'$\mathcal{E}$ [eV]'
+                elif norm == m_e*c**2/e*1e-3 or norm == 511:
+                    return r'$\mathcal{E}$ [keV]'
+                elif norm == m_e*c**2/e*1e-6 or norm == 0.511:
+                    return r'$\mathcal{E}$ [MeV]'
+                elif norm == m_e*c**2/e*1e-9 or norm == 0.000511:
+                    return r'$\mathcal{E}$ [GeV]'
+                else:
+                    return r'$\gamma$'
+    elif 'div' in coord:
+        Dir = coord.split('_')[-1]
+        match norm:
+            case 1:
+                return f'$\\theta_{{{Dir}}}$'
+            case 1e3:
+                return f'$\\theta_{{{Dir}}}$ [mrad]'
+            case 1e6:
+                return f'$\\theta_{{{Dir}}}$ [$\\mu$rad]'
+            case 1e9:
+                return f'$\\theta_{{{Dir}}}$ [nrad]'
+            case _:
+                return f'$\\theta_{{{Dir}}}$'
+    elif 'beta' in coord:
+        Dir = coord.split('_')[-1]
+        return f'$\\beta_{{{Dir}}}$'
