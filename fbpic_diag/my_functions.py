@@ -1411,7 +1411,7 @@ class Diag(object):
             comp[1] = compy
         else:
             for i, com in enumerate(components):
-                if com in self.avail_record_components[species]:
+                if com in self.avail_record_components[species] or com == 'gamma':
                     comp[i],weight = self.select_particles([com,'w'], iteration=iteration,
                                                             select=select, species=species)
                 else:
