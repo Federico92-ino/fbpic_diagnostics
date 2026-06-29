@@ -6,7 +6,7 @@ Set of functions by FA
 import numpy as np
 import matplotlib.pyplot as plt
 from openpmd_viewer import OpenPMDTimeSeries, ParticleTracker
-import json
+import json, copy
 from scipy.constants import e, m_e, c, pi,epsilon_0
 from scipy.signal import hilbert
 from fbpic_diag.utils import *
@@ -1278,8 +1278,6 @@ class Diag(object):
                 Bin = np.full(bins+1,np.nan)
                 values = np.full(bins,np.nan)
             else:
-                pre_values, Bin = np.histogram(z, bins=bins, weights=q*vz*w*ipp)
-                inv_dz = bins/(z.max()-z.min())
                 values = np.abs(pre_values*inv_dz)
             inv_norm_z = 1.
         elif self.__in_records__([component],species):
@@ -1478,7 +1476,7 @@ class Diag(object):
 
         return P
 
-    def joined_species_beam_properties(self, property, species_list,
+    def joint_species_beam_properties(self, property, species_list,
                                        select_list, trans_space='x',
                                        t_lim=False, output=True, plot=False,
                                        norm_z=1, Norm=1., statistics='rms', **kwargs):
@@ -1505,7 +1503,8 @@ class Diag(object):
         species_list: list of str
             List of joining species
 
-        select_list: list of dict or ParticleTracker object, optional
+        select_list: list of dict or ParticleTracker object. Each element is initialized
+            as the kwarg 'select'.
              - If `select` is a dictionary:
              then it lists a set of rules to select the particles, of the form
              'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
@@ -1518,9 +1517,6 @@ class Diag(object):
              iteration ; see the docstring of `ParticleTracker` for more info.
              - If 'select' contains 'z' and 'zeta_coord'='True':
              selection is made in co-moving frame
-                species: str
-            A string indicating the name of the species.
-            This is optional if there is only one species.
 
         trans_space: str
             'x' or 'y' transverse phase space; default is 'x'
@@ -1695,3 +1691,144 @@ class Diag(object):
                 return Z, a
             if plot:
                 plt.plot(Z*norm_z, a*Norm, **kwargs)
+
+    def joint_spectrum(self, component, iteration, species_list, select_list,
+                    norm_z =1., output=False, charge=False, plot=True, **kwargs):
+            """
+            Method to get the joint 'component' distribution of 'species_list' particles
+            according to 'select_list' selection
+
+            **Parameters**
+
+            component: str
+                Choose a component in .avail_recorded_components
+                to do the weighted distibution of that quantity;
+                also 'div_x', 'div_y' and 'div_2' are accepted.
+                If 'current', it returns the longitudinal current
+                carried by the specific 'species' versus 'z';
+                positive values in Ampere (A). 
+
+            iteration: int
+                Which iteration we need
+
+            species_list: list of str
+                List of joining species
+
+            select_list: list of dict or ParticleTracker object. Each element is initialized
+                as the kwarg 'select'.
+                 - If `select` is a dictionary:
+                 then it lists a set of rules to select the particles, of the form
+                 'ux' : [-0.1, 0.1] (Particles having ux between -0.1 and 0.1 mc)
+                 'x' : [-4., 10.]   (Particles having x between -4 and 10 meters)
+                 'uz' : [5., None]  (Particles with uz above 5 mc)
+                 - also the key 'div' can be passed as single value in rad to select
+                 particles in a cone of aperture 2*div
+                 - If `select` is a ParticleTracker object:
+                 then it returns particles that have been selected at another
+                 iteration ; see the docstring of `ParticleTracker` for more info.
+                 - If 'select' contains 'z' and 'zeta_coord'='True':
+                 selection is made in co-moving frame
+
+            output: bool, optional, default: 'False'
+                If 'True' returns the values of histogram and bins
+                edges; length of bins array is nbins+1 
+                (lefts edges and right edge of the last bin).
+
+            norm_z: float, optional
+                A constant to multiply the x-axis.
+
+            charge: bool, optional
+                If True this sets the y-axis on dQ/dcomp values, except in case
+                component is 'current'.
+                Default is False, that means setting y-axis on dN/dcomp values
+
+            plot: bool, default: 'True'
+                Boolean to turn on plotting
+
+            **kwargs: keyword to pass to .hist() method.
+
+            **Returns**
+
+                values, bins: np.arrays
+                    If 'output' is True, arrays with bins values and bins edges in MKS units,
+                    regardless of 'norm_z' factor.sim.avail_record_components
+                The plotted graph returns dN(dQ)/dcomp vs comp with axis units according to norm_z;
+                in case of 'current', it's returned in Ampere vs z.
+
+            """
+            species_select = dict(zip(species_list,select_list))
+            bins = 300
+            if 'density' in kwargs:
+                del kwargs['density']
+
+            if 'weights' in kwargs:
+                del kwargs['weights']
+
+            if 'bins' in kwargs:
+                bins = kwargs['bins']
+                del kwargs['bins'] 
+
+            for species in select_list:
+                if species not in self.avail_species:
+                    raise ValueError(f"{species} is not in {self.avail_species}.")                
+                if isinstance(self.params['subsampling_fraction'],dict):
+                    ipp = 1/self.params['subsampling_fraction'][species]
+                else:
+                    ipp = 1/self.params['subsampling_fraction']
+                if component == 'current':
+                    z, uz, gamma, q, w = self.select_particles(['z','uz','gamma','charge','w'],
+                                                                iteration=iteration, species=species, select=species_select[species])
+                    if 'Z' not in locals() and 'W' not in locals():
+                        Z = copy.deepcopy(z)
+                        W = copy.deepcopy(w)
+                        qipp_VZ = c*uz/gamma*q*ipp
+                    else:
+                        Z = np.append(Z,z)
+                        W = np.append(W,w)
+                        qipp_VZ = np.append(qipp_VZ,c*uz/gamma*q*ipp)                        
+                elif self.__in_records__([component],species):
+                    comp, q, w = self.select_particles([component, 'charge', 'w'],
+                                                        iteration=iteration, species=species, select=species_select[species])
+                    if not charge:
+                        q = 1.
+                    if 'Comp' not in locals() and 'W' not in locals():
+                        Comp = copy.deepcopy(comp)
+                        W = copy.deepcopy(q*ipp*w)
+                    else:
+                        Comp = np.append(Comp,comp)
+                        W = np.append(W,q*ipp*w)
+                else:
+                    comp = self.__not_in_records__(component, iteration=iteration,
+                                                   species=species, select=species_select[species])
+                    q, w = self.select_particles(['charge','w'], iteration=iteration,
+                                                 species=species, select=species_select[species])
+                    if not charge:
+                        q = 1.
+                    if 'Comp' not in locals() and 'W' not in locals():
+                        Comp = copy.deepcopy(comp)
+                        W = copy.deepcopy(q*ipp*w)
+                    else:
+                        Comp = np.append(Comp,comp)
+                        W = np.append(W,q*ipp*w)
+            if component == 'current':
+                try:
+                    pre_values, Bin = np.histogram(Z, bins=bins, weights=qipp_VZ*W)
+                    inv_dz = bins/(Z.max()-Z.min())
+                except:
+                    print("There are no particles; current set to 'NaN'")
+                    Bin = np.full(bins+1,np.nan)
+                    values = np.full(bins,np.nan)
+                else:
+                    values = np.abs(pre_values*inv_dz)
+                inv_norm_z = 1.
+            else:
+                pre_values, Bin = np.histogram(Comp, bins=bins, weights=W)
+                inv_dz = bins/(Comp.max()-Comp.min())
+                values = np.abs(pre_values*inv_dz)
+                inv_norm_z = 1/norm_z
+            if plot:
+                _, _, _ = plt.hist(Bin[:-1]*norm_z, Bin*norm_z, weights=values*inv_norm_z, **kwargs)
+                del _
+                plt.xlabel(f"{coord_label(component,norm_z)}")
+            if output:
+                return values, Bin
