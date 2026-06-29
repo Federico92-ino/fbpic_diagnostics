@@ -1768,7 +1768,7 @@ class Diag(object):
                 bins = kwargs['bins']
                 del kwargs['bins'] 
 
-            for species in select_list:
+            for species in species_list:
                 if species not in self.avail_species:
                     raise ValueError(f"{species} is not in {self.avail_species}.")                
                 if isinstance(self.params['subsampling_fraction'],dict):
